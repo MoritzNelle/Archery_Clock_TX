@@ -23,7 +23,8 @@ bool FFWState =  false;
 int currentGroup = 1;
 int nextGroup = 1;
 int actRound = 1;
-unsigned long timerOne = 0;
+//unsigned long timerOne = 0;
+int subRound = 0;
 
 
 #include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
@@ -145,7 +146,34 @@ void fade(int color){
 //   }
 // }
 
+
+
+void displayGroup(){
+  for (int i = NUM_PIXELS-numLedGroupIndication; i < NUM_PIXELS; i++) {
+    clock1.setPixelColor(i, clock1.ColorHSV(colorOfGroups[listOfGroups[0]-1], 255, maxBrightness));
+  }
+  clock1.show();
+
+  for (int j = NUM_PIXELS-numLedGroupIndication-numLedNextGroup; j < NUM_PIXELS-numLedGroupIndication; j++) {
+    clock1.setPixelColor(j, clock1.ColorHSV(colorOfGroups[listOfGroups[1]-1], 255, maxBrightness));
+  }
+
+//Serial.print("currentGroup: ");Serial.println(currentGroup);
+
+  if (subRound+1 == numGroups) {
+    for (int k = NUM_PIXELS-numLedGroupIndication-numLedNextGroup; k < NUM_PIXELS-numLedGroupIndication; k++) {
+      clock1.setPixelColor(k, clock1.ColorHSV(colorOfGroups[listOfGroups[2]-1], 255, maxBrightness));
+    }
+  }
+
+  clock1.show();
+
+}
+
+
 void hold(){
+
+  displayGroup();
   HoldState = true;
   while (HoldState==true && FFWState==false)
   {
@@ -164,27 +192,7 @@ void updateGroups(){
 }
 
 
-void displayGroup(int currentGroup){
-  for (int i = NUM_PIXELS-numLedGroupIndication; i < NUM_PIXELS; i++) {
-    clock1.setPixelColor(i, clock1.ColorHSV(colorOfGroups[listOfGroups[0]-1], 255, maxBrightness));
-  }
-  clock1.show();
 
-  for (int j = NUM_PIXELS-numLedGroupIndication-numLedNextGroup; j < NUM_PIXELS-numLedGroupIndication; j++) {
-    clock1.setPixelColor(j, clock1.ColorHSV(colorOfGroups[listOfGroups[1]-1], 255, maxBrightness));
-  }
-
-Serial.print("currentGroup: ");Serial.println(currentGroup);
-
-  if (currentGroup == numGroups) {
-    for (int k = NUM_PIXELS-numLedGroupIndication-numLedNextGroup; k < NUM_PIXELS-numLedGroupIndication; k++) {
-      clock1.setPixelColor(k, clock1.ColorHSV(colorOfGroups[listOfGroups[2]-1], 255, maxBrightness));
-    }
-  }
-
-  clock1.show();
-
-}
 
 //--------------------------------------------------------------------------------
 
@@ -213,10 +221,10 @@ void loop() {
   while (actRound <= numRounds) {
     Serial.print("actRound: ");Serial.println(actRound);  // print the actual round for debugging
 
-    for (int i = 0; i < numGroups; i++) {
+    for (subRound = 0; subRound < numGroups; subRound++) {
       for(int j = 0; j < (sizeof(listOfGroups)/sizeof(listOfGroups[0])); j++) {Serial.print(listOfGroups[j]);}Serial.println(); // print the list of groups for debugging
 
-      displayGroup(i+1);
+      displayGroup();
       countDown(0,numLedTimer, colorOfGetToLine, secGetToLine); // get to the line
       countDown(0,numLedTimer, colorOfTimer, secShooting);      // shooting
       updateGroups();
