@@ -4,7 +4,8 @@
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
 #define secShooting     90    // time for shooting
 #define numGroups       4     // min. 1, max 4 groups
-#define maxBrightness   20   // max 0-255 (0 = off, 255 = full brightness)
+float maxBrightness   = 2;   // 2(!)-255 (0 = off, 255 = full brightness)
+
 
 //CLOCK VARIABLES (only meant to be changed by the user if a new/diffrent clock is used AND the user knows what they are doing)
 unsigned int colorOfGroups[4] = {0, 21845, 10922, 43681};  // group 1/A: red, group 2/B: green, group 3/C: yellow, group 4/D: blue
@@ -25,6 +26,7 @@ int nextGroup = 1;
 int actRound = 1;
 //unsigned long timerOne = 0;
 int subRound = 0;
+float fadeDelayCorrection = 0.925; // delay correction for the fade function, in milliseconds; the higher the value, the slower the fade
 
 
 #include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
@@ -69,12 +71,12 @@ void checkButtons(){
 
 }
 
-void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,unsigned long duration){
+void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float duration){
 
-  int iterations = log(maxBrightness) / log(1.05);
+  float iterations = log(maxBrightness) / log(1.05);
   float numPixels = lastPixel - firstPixel;
   float fadeDelay = (duration*1000 / iterations)/numPixels; // delay for each brightness level; 1/numLedGroupIndication = 0 ... WHY?
-  
+  fadeDelay = fadeDelay * fadeDelayCorrection;  
   for (int i = firstPixel; i <= lastPixel; i++) {
     clock1.setPixelColor(i, clock1.ColorHSV(color, 255, maxBrightness));
   }
@@ -190,8 +192,6 @@ void updateGroups(){
   }
   listOfGroups[numGroups - 1] = temp;
 }
-
-
 
 
 //--------------------------------------------------------------------------------
