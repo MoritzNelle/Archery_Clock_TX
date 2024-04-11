@@ -194,17 +194,38 @@ void updateGroups(){
   listOfGroups[numGroups - 1] = temp;
 }
 
+  void checkColors() {
+
+    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(maxBrightness,0,0));}
+    clock1.show();
+    delay(1000);
+
+    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,maxBrightness,0));}
+    clock1.show();
+    delay(1000);
+
+    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,0,maxBrightness));}
+    clock1.show();
+    delay(1000);
+
+
+    clock1.clear();
+    clock1.show();
+  }
 
 //--------------------------------------------------------------------------------
 
 void setup() {
 
-  for (int i = 0; i < numGroups; i++) {
+  for (int i = 0; i < numGroups; i++) { // fill the list of groups with the numbers 1 to numGroups [1,2,3,...,numGroups]
     listOfGroups[i] = i+1;
   } 
 
-  //delay(3000); // 3 second delay for recovery
+  delay(500);            // for recovery
   clock1.begin();        // initialize NeoPixel strip object
+  clock1.clear();        // clear all registers from previous entries
+  clock1.show();         // display the cleared registers
+
   Serial.begin(9600);    // initialize serial communication at 9600 bits per second
 
   pinMode(FFWbutton, INPUT_PULLUP);   // both buttons are connected to GROUND (not VCC) and pulled up with internal pullup resistors
@@ -213,6 +234,8 @@ void setup() {
   if (numGroups < 1) {
     nextGroup = 2;
   }
+
+  checkColors();
 
   //hold();         // holds every thing on start up until the hold- or continue-button is pressed for the first time
 }
