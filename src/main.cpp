@@ -82,12 +82,15 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
   }
   clock1.show();
 
-
   for (int i = lastPixel; i >= firstPixel; i--) {
     for (float brightness = maxBrightness; brightness > 1; brightness = brightness / 1.05) {
       clock1.setPixelColor(i, clock1.ColorHSV(color, 255, brightness));
       clock1.show();
-      delay(fadeDelay);
+
+    unsigned long startTime = millis();
+      while(millis() - startTime < fadeDelay) {
+        checkButtons();
+      }
     
       checkButtons();
       while (HoldState==true)
@@ -100,11 +103,9 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
         FFWState = false;
         return;
       }
-
   }
     clock1.setPixelColor(i, clock1.Color(0, 0, 0)); // set LED color to off
     clock1.show();
- 
   }  
 }
 
