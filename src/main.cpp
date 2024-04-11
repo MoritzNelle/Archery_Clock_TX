@@ -244,10 +244,11 @@ void pingPong(){
   int currentPos = startPos;
   int direction = 1; // 1 for moving right, -1 for moving left
   int colorIndex = 0; // index to keep track of the current color
+  int colorOfPixel = 0;
 
   while (HoldState == false && FFWState == false) {
     clock1.clear();
-    clock1.setPixelColor(currentPos, clock1.ColorHSV(colorOfTimer, 255, maxBrightness));
+    clock1.setPixelColor(currentPos, clock1.ColorHSV(colorOfPixel, 255, maxBrightness));
     clock1.show();
     delay(100);
 
@@ -264,11 +265,11 @@ void pingPong(){
 
     // Set color based on color index
     if (colorIndex == 0) {
-      colorOfTimer = 0; // red
+      colorOfPixel = 0; // red
     } else if (colorIndex == 1) {
-      colorOfTimer = 21845; // green
+      colorOfPixel = 21845; // green
     } else if (colorIndex == 2) {
-      colorOfTimer = 43681; // blue
+      colorOfPixel = 43681; // blue
     }
 
     checkButtons();
