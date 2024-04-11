@@ -1,3 +1,22 @@
+/* Archery Clock
+ * 
+ * This program controls an archery clock system using an Arduino and a NeoPixel LED strip. It displays timing and group information for archery competitions, providing visual cues for different phases of the competition.
+ * 
+ * Requirements:
+ * - Arduino microcontroller
+ * - Adafruit NeoPixel LED strip
+ * - 2 buttons (Fast Forward, Hold)
+ * - Arduino IDE or PlatformIO
+ * 
+ * Installation:
+ * 1. Connect the NeoPixel strip and Buttons to the Arduino.
+ * 2. Open `main.cpp` in the Arduino IDE or PlatformIO.
+ * 3. Compile and upload the program to the Arduino.
+ * 
+ * Usage:
+ * The program runs automatically once uploaded. It controls the LED strip to display timing and group information. Adjust colors and timings in `main.cpp`. Don't touch the other variables unless you know what you're doing.*/
+
+
 // COMPETITION VARIABLES (meant to be changed by the user)
 #define numRounds       10    // 
 //#define numArrows      3
