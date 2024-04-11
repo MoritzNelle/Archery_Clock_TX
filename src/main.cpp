@@ -1,10 +1,11 @@
 // COMPETITION VARIABLES (meant to be changed by the user)
 #define numRounds       10    // 
-//#define numArrows       3
+//#define numArrows      3
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
 #define secShooting     90    // time for shooting
-#define numGroups       4     // min. 1, max 4 groups
-float maxBrightness   = 2;   // 2(!)-255 (0 = off, 255 = full brightness)
+#define numGroups        4     // min. 1, max 4 groups
+float maxBrightness   =  20;   // 2(!)-255 (2 = lowest, 255 = full brightness)
+#define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 
 //CLOCK VARIABLES (only meant to be changed by the user if a new/diffrent clock is used AND the user knows what they are doing)
@@ -17,6 +18,7 @@ float numLedNextGroup      =    1;
 #define numLedGap               1
 int numLedTimer = NUM_PIXELS - numLedGroupIndication - numLedNextGroup - numLedGap -1;
 int listOfGroups[numGroups];
+
 
 //SYSTEM VARIABLES (NO TOUCHY TOUCHY!...NEVER! otherwise you will break the code and the world will end...or something like that)
 bool HoldState = false;
@@ -194,24 +196,66 @@ void updateGroups(){
   listOfGroups[numGroups - 1] = temp;
 }
 
-  void checkColors() {
+void checkColors() {
+  clock1.clear();
 
-    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(maxBrightness,0,0));}
-    clock1.show();
-    delay(1000);
+  for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(maxBrightness,0,0));}
+  clock1.show();
+  delay(1000);
 
-    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,maxBrightness,0));}
-    clock1.show();
-    delay(1000);
+  for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,maxBrightness,0));}
+  clock1.show();
+  delay(1000);
 
-    for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,0,maxBrightness));}
-    clock1.show();
-    delay(1000);
+  for (int i = 0; i < NUM_PIXELS; i++) {clock1.setPixelColor(i, clock1.Color(0,0,maxBrightness));}
+  clock1.show();
+  delay(1000);
 
+  clock1.clear();
+  clock1.show();
+}
 
+void pingPong(){
+  int startPos = 0;
+  int endPos = NUM_PIXELS - 1;
+  int currentPos = startPos;
+  int direction = 1; // 1 for moving right, -1 for moving left
+  int colorIndex = 0; // index to keep track of the current color
+
+  while (HoldState == false && FFWState == false) {
     clock1.clear();
+    clock1.setPixelColor(currentPos, clock1.ColorHSV(colorOfTimer, 255, maxBrightness));
     clock1.show();
+    delay(100);
+
+    currentPos += direction;
+    if (currentPos > endPos) {
+      currentPos = endPos - 1;
+      direction = -1;
+      colorIndex = (colorIndex + 1) % 3; // increment color index
+    } else if (currentPos < startPos) {
+      currentPos = startPos + 1;
+      direction = 1;
+      colorIndex = (colorIndex + 1) % 3; // increment color index
+    }
+
+    // Set color based on color index
+    if (colorIndex == 0) {
+      colorOfTimer = 0; // red
+    } else if (colorIndex == 1) {
+      colorOfTimer = 21845; // green
+    } else if (colorIndex == 2) {
+      colorOfTimer = 43681; // blue
+    }
+
+    checkButtons();
   }
+  clock1.clear();
+  clock1.show();
+
+  HoldState = false;
+  FFWState = false;
+}
 
 //--------------------------------------------------------------------------------
 
@@ -235,9 +279,35 @@ void setup() {
     nextGroup = 2;
   }
 
-  checkColors();
+  switch (startPhase) {
+    case 0:
+      // No start phase, just start the competition right away
+      break;
 
-  //hold();         // holds every thing on start up until the hold- or continue-button is pressed for the first time
+    case 1:
+      checkColors();
+      for (int i = 0; i <= numLedTimer; i++) {clock1.setPixelColor(i, clock1.ColorHSV(colorOfGetToLine, 255, maxBrightness));}  // demonstrate the get to the line-timer
+      clock1.show();
+      hold();
+      break;
+    
+    case 2:
+      for (int i = 0; i <= numLedTimer; i++) {clock1.setPixelColor(i, clock1.ColorHSV(colorOfGetToLine, 255, maxBrightness));}  // demonstrate the get to the line-timer
+      clock1.show();
+      hold();
+      break;
+    
+    case 3:
+      pingPong();
+      for (int i = 0; i <= numLedTimer; i++) {clock1.setPixelColor(i, clock1.ColorHSV(colorOfGetToLine, 255, maxBrightness));}  // demonstrate the get to the line-timer
+      clock1.show();
+      hold();
+      break;
+
+    default:
+      // No start phase, just start the competition right away
+      break;
+  }
 }
 
 void loop() {
