@@ -49,6 +49,8 @@ void checkButtons(){
     while (!digitalRead(FFWbutton)) {
       delay(debounceDuration);
     }
+    delay(debounceDuration);
+
     if (FFWState == false){
       FFWState = true;
     } else {
@@ -62,6 +64,8 @@ void checkButtons(){
     while (!digitalRead(Holdbutton)) {
       delay(debounceDuration);
     }
+    delay(debounceDuration);
+
     if (HoldState == false){
       HoldState = true;
     } else {
@@ -111,7 +115,7 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
   }  
 }
 
-void fade(int color){
+void fade(int color){                                                       // can not be skipped nor hold, this is by design!!!
   clock1.clear();                                                           // clear all registers, in theory not necessary
   for (int i = 0; i < 3; i++) {                                             // repeat the fade 3 times
     for (int j = 0; j < NUM_PIXELS; j++) {                                  // fade in
@@ -124,7 +128,7 @@ void fade(int color){
       clock1.setPixelColor(j, clock1.ColorHSV(color, 255, 0));              // set LED color to off
     }
     clock1.show();
-    delay(500);                                                            // duration of off
+    delay(500);                                                             // duration of off
   }
 }
 
