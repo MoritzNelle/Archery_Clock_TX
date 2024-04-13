@@ -21,9 +21,9 @@
 #define numRounds       10    // 
 //#define numArrows      3
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
-#define secShooting     90    // time for shooting
+#define secShooting     20    // time for shooting
 #define numGroups        4     // min. 1, max 4 groups
-float maxBrightness   =  20;   // 2(!)-255 (2 = lowest, 255 = full brightness)
+float maxBrightness   =  255;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 #define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 
@@ -31,6 +31,8 @@ float maxBrightness   =  20;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 unsigned int colorOfGroups[4] = {0, 21845, 10922, 43681};  // group 1/A: red, group 2/B: green, group 3/C: yellow, group 4/D: blue
 int colorOfTimer              = 21845;  // green //enter color in HSV format (0-65535);
 int colorOfGetToLine          = 43681;  // blue  //enter color in HSV format (0-65535);
+int warningColor              = 5000;
+int warningSec                = 10;     // time in seconds before the end of the shooting phase when the warning color is displayed       
 #define NUM_PIXELS              18
 float numLedGroupIndication =   2;
 float numLedNextGroup      =    1;
@@ -96,18 +98,31 @@ void checkButtons(){
 
 }
 
-void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float duration){
+void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float duration, bool warning){
 
   float iterations = log(maxBrightness) / log(1.05);
   float numPixels = lastPixel - firstPixel;
   float fadeDelay = (duration*1000 / iterations)/numPixels; // delay for each brightness level; 1/numLedGroupIndication = 0 ... WHY?
-  fadeDelay = fadeDelay * fadeDelayCorrection;  
+  fadeDelay = fadeDelay * fadeDelayCorrection;
+
+  int warningPixel = (numPixels/duration * warningSec);
+  Serial.print("warningPixel: ");Serial.println(warningPixel);
+
   for (int i = firstPixel; i <= lastPixel; i++) {
     clock1.setPixelColor(i, clock1.ColorHSV(color, 255, maxBrightness));
   }
   clock1.show();
 
   for (int i = lastPixel; i >= firstPixel; i--) {
+
+    if (warning == true && i == warningPixel) {
+      for (int j = i; j >= firstPixel; j--) {
+        clock1.setPixelColor(j, clock1.ColorHSV(warningColor, 255, maxBrightness));
+      }
+      clock1.show();
+      color = warningColor;
+    }
+
     for (float brightness = maxBrightness; brightness > 1; brightness = brightness / 1.05) {
       clock1.setPixelColor(i, clock1.ColorHSV(color, 255, brightness));
       clock1.show();
@@ -343,8 +358,8 @@ void loop() {
       for(int j = 0; j < (sizeof(listOfGroups)/sizeof(listOfGroups[0])); j++) {Serial.print(listOfGroups[j]);}Serial.println(); // print the list of groups for debugging
 
       displayGroup();
-      countDown(0,numLedTimer, colorOfGetToLine, secGetToLine); // get to the line
-      countDown(0,numLedTimer, colorOfTimer, secShooting);      // shooting
+      countDown(0,numLedTimer, colorOfGetToLine, secGetToLine, false); // get to the line
+      countDown(0,numLedTimer, colorOfTimer,     secShooting,  true );      // shooting
       updateGroups();
     }
     updateGroups();
