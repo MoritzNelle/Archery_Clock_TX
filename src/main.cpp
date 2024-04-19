@@ -21,9 +21,9 @@
 #define numRounds       10    // 
 //#define numArrows      3
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
-#define secShooting     20    // time for shooting
+#define secShooting     90    // time for shooting
 #define numGroups        4     // min. 1, max 4 groups
-float maxBrightness   =  255;   // 2(!)-255 (2 = lowest, 255 = full brightness)
+float maxBrightness   =  40;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 #define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 
@@ -55,9 +55,9 @@ float fadeDelayCorrection = 0.925; // delay correction for the fade function, in
 #include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
 #include <Adafruit_NeoPixel.h>    // include the Adafruit NeoPixel library, alternative to the FastLED library
 
-#define LEDPIN 6                  // 
-#define FFWbutton 2               // all GPIO pins can be used
-#define Holdbutton 3              // all GPIO pins can be used
+#define LEDPIN      16             // 
+#define FFWbutton   22             // all GPIO pins can be used
+#define Holdbutton 23              // all GPIO pins can be used
 
 Adafruit_NeoPixel clock1(NUM_PIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
 
