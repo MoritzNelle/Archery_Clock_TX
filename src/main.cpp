@@ -16,6 +16,11 @@
  * Usage:
  * The program runs automatically once uploaded. It controls the LED strip to display timing and group information. Adjust colors and timings in `main.cpp`. Don't touch the other variables unless you know what you're doing.*/
 
+#include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
+#include <Adafruit_NeoPixel.h>    // include the Adafruit NeoPixel library, alternative to the FastLED library
+#include <esp_now.h>
+#include <WiFi.h>
+
 
 // COMPETITION VARIABLES (meant to be changed by the user)
 #define numRounds       10    // 
@@ -40,6 +45,11 @@ float numLedNextGroup      =    1;
 int numLedTimer = NUM_PIXELS - numLedGroupIndication - numLedNextGroup - numLedGap -1;
 int listOfGroups[numGroups];
 
+uint8_t receiverAddresses[][6] = {  // MAC addresses of the receivers
+  {0x30, 0xc6, 0xf7, 0x30, 0x21, 0x5c},
+  {0xc8, 0xc9, 0xa3, 0xc9, 0x61, 0xcc},
+};
+
 
 //SYSTEM VARIABLES (NO TOUCHY TOUCHY!...NEVER! otherwise you will break the code and the world will end...or something like that)
 bool HoldState = false;
@@ -51,9 +61,18 @@ int actRound = 1;
 int subRound = 0;
 float fadeDelayCorrection = 0.925; // delay correction for the fade function, in milliseconds; the higher the value, the slower the fade
 
+// Define a data structure
+typedef struct structTX {
+  int a;
+  int b;
+} structTX;
 
-#include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
-#include <Adafruit_NeoPixel.h>    // include the Adafruit NeoPixel library, alternative to the FastLED library
+// Create a structured object
+structTX TXdata;
+
+// Peer info
+esp_now_peer_info_t peerInfo[sizeof(receiverAddresses) / sizeof(receiverAddresses[0])]; // Adjust the size of the array based on the number of receivers
+
 
 #define LEDPIN      16             // 
 #define FFWbutton   22             // all GPIO pins can be used
@@ -63,10 +82,28 @@ Adafruit_NeoPixel clock1(NUM_PIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
 
 //--------------------------------------------------------------------------------
 
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {    // Callback function called when data is sent
+  // Serial.print("\r\nLast Packet Send Status:\t");
+  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+
+void sentID(int id) {
+  TXdata.a = id;
+  for (int i = 0; i < sizeof(receiverAddresses) / sizeof(receiverAddresses[0]); i++) {
+    esp_err_t result = esp_now_send(receiverAddresses[i], (uint8_t *) &TXdata, sizeof(TXdata));
+    if (result == ESP_OK) {
+      // Serial.println("Sent with success");
+    } else {
+      // Serial.println("Error sending the data");
+    }
+  }
+  Serial.print("ID sent: "); Serial.println(TXdata.a);
+}
+
 void checkButtons(){
   int debounceDuration = 50;
 
-  if (!digitalRead(FFWbutton)) {
+  if (!digitalRead(FFWbutton) && HoldState == false) {
     while (!digitalRead(FFWbutton)) {
       delay(debounceDuration);
     }
@@ -79,6 +116,7 @@ void checkButtons(){
     }
     //Serial.print("FFWbutton pressed, FFWState: ");
     //Serial.println(FFWState);
+    sentID(1234);
   }
 
   if (!digitalRead(Holdbutton)) {
@@ -94,8 +132,8 @@ void checkButtons(){
     }
     //Serial.print("Holdbutton pressed, HoldState: ");
     //Serial.println(HoldState);
+    sentID(2314);
   }
-
 }
 
 void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float duration, bool warning){
@@ -106,7 +144,7 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
   fadeDelay = fadeDelay * fadeDelayCorrection;
 
   int warningPixel = (numPixels/duration * warningSec);
-  Serial.print("warningPixel: ");Serial.println(warningPixel);
+  //Serial.print("warningPixel: ");Serial.println(warningPixel);
 
   for (int i = firstPixel; i <= lastPixel; i++) {
     clock1.setPixelColor(i, clock1.ColorHSV(color, 255, maxBrightness));
@@ -265,7 +303,7 @@ void pingPong(){
     clock1.clear();
     clock1.setPixelColor(currentPos, clock1.ColorHSV(colorOfPixel, 255, maxBrightness));
     clock1.show();
-    delay(100);
+    delay(2000/NUM_PIXELS);
 
     currentPos += direction;
     if (currentPos > endPos) {
@@ -285,6 +323,10 @@ void pingPong(){
       colorOfPixel = 21845; // green
     } else if (colorIndex == 2) {
       colorOfPixel = 43681; // blue
+    }
+
+    if (currentPos == startPos && colorIndex == 0) {
+      sentID(2873);
     }
 
     checkButtons();
@@ -309,7 +351,35 @@ void setup() {
   clock1.clear();        // clear all registers from previous entries
   clock1.show();         // display the cleared registers
 
-  Serial.begin(9600);    // initialize serial communication at 9600 bits per second
+  Serial.begin(115200);    // initialize serial communication at 9600 bits per second
+
+
+// Begin ESP-NOW setup
+
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != ESP_OK) {  // Initialize ESP-NOW
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  esp_now_register_send_cb(OnDataSent);  // Register the send callback
+
+    // Add the receivers' peer information
+  for (int i = 0; i < sizeof(receiverAddresses) / sizeof(receiverAddresses[0]); i++) {
+    memcpy(peerInfo[i].peer_addr, receiverAddresses[i], 6);
+    peerInfo[i].channel = 0;
+    peerInfo[i].encrypt = false;
+
+    if (esp_now_add_peer(&peerInfo[i]) != ESP_OK) {
+      Serial.println("Failed to add peer");
+      return;
+    }
+  }
+
+
+// End ESP-NOW setup
+
 
   pinMode(FFWbutton, INPUT_PULLUP);   // both buttons are connected to GROUND (not VCC) and pulled up with internal pullup resistors
   pinMode(Holdbutton, INPUT_PULLUP);
@@ -347,15 +417,18 @@ void setup() {
       // No start phase, just start the competition right away
       break;
   }
+
+  sentID(1458);
 }
 
 void loop() {
   //checkButtons();
+  
   while (actRound <= numRounds) {
-    Serial.print("actRound: ");Serial.println(actRound);  // print the actual round for debugging
+    //Serial.print("actRound: ");Serial.println(actRound);  // print the actual round for debugging
 
     for (subRound = 0; subRound < numGroups; subRound++) {
-      for(int j = 0; j < (sizeof(listOfGroups)/sizeof(listOfGroups[0])); j++) {Serial.print(listOfGroups[j]);}Serial.println(); // print the list of groups for debugging
+      //for(int j = 0; j < (sizeof(listOfGroups)/sizeof(listOfGroups[0])); j++) {Serial.print(listOfGroups[j]);}Serial.println(); // print the list of groups for debugging
 
       displayGroup();
       countDown(0,numLedTimer, colorOfGetToLine, secGetToLine, false); // get to the line
