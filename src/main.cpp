@@ -32,13 +32,14 @@ float maxBrightness   =  40;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 #define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 //TONE VARIABLES (meant to be changed by the user)
-int tone1 [] {1000}; // frequency in Hz, duration beween tones is defined by a diffrent variable
-int tone2 [] {2000, 3000};
+int tone1 [] {440}; // frequency in Hz, duration beween tones is defined by a diffrent variable
+int tone2 [] {440, 440};
 int tone3 [] {440, 440, 440};
-int tone4 [] {7000, 8000, 9000, 10000};
+int tone4 [] {440, 440, 440, 440};
+int tone5 [] {440, 440, 440, 440, 440};
 
-#define toneDuration  700 // duration of each tone in milliseconds
-#define toneGap       200 // duration between each tone in milliseconds
+#define toneDuration  750 // duration of each tone in milliseconds
+#define toneGap       250 // duration between each tone in milliseconds
 
 
 //CLOCK VARIABLES (only meant to be changed by the user if a new/diffrent clock is used AND the user knows what they are doing)
@@ -172,6 +173,13 @@ void buzz(int toneID){   // MARK: BUZZ
     case 4:
       for (int i = 0; i < sizeof(tone4) / sizeof(tone4[0]); i++) {
         tone(buzzer, tone4[i], toneDuration);
+        tone(buzzer, 0, toneGap);
+      }
+      break;
+    
+    case 5:
+      for (int i = 0; i < sizeof(tone5) / sizeof(tone5[0]); i++) {
+        tone(buzzer, tone5[i], toneDuration);
         tone(buzzer, 0, toneGap);
       }
       break;
@@ -469,23 +477,30 @@ void setup() {  //MARK: SETUP
 void loop() { //MARK: LOOP
   //checkButtons();
   
-  buzz(3);
-
   while (actRound <= numRounds) {
     //Serial.print("actRound: ");Serial.println(actRound);  // print the actual round for debugging
-
+    buzz(2);
+    
     for (subRound = 0; subRound < numGroups; subRound++) {
       //for(int j = 0; j < (sizeof(listOfGroups)/sizeof(listOfGroups[0])); j++) {Serial.print(listOfGroups[j]);}Serial.println(); // print the list of groups for debugging
 
       displayGroup();
       countDown(0,numLedTimer, colorOfGetToLine, secGetToLine, false); // get to the line
+      buzz(1);
       countDown(0,numLedTimer, colorOfTimer,     secShooting,  true );      // shooting
+      
+      if (subRound+1 != numGroups) {
+        buzz(2);
+      }
       updateGroups();
     }
+    buzz(3);
     updateGroups();
     fade(0);                                                // indicates the end of shooting 
     hold(); // holds every thing after the last group shoot until the hold- or continue-button is pressed, time to collect the arrows and write down the scores
+    
     actRound++;
   }
+  buzz(5);
   //competition is over
 }
