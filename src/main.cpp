@@ -379,11 +379,11 @@ void pingPong(){  // MARK: PINGPONG
       colorOfPixel = 43681; // blue
     }
 
-    if (currentPos == startPos && colorIndex == 0) {
+    checkButtons();
+    if (currentPos == 1 && direction == 1 && colorIndex == 0) {
       sentID(2873);
     }
 
-    checkButtons();
   }
   clock1.clear();
   clock1.show();
