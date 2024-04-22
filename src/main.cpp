@@ -442,6 +442,8 @@ void setup() {  //MARK: SETUP
     nextGroup = 2;
   }
 
+  sentID(7354); // let the receivers know that the master has (re)booted
+
   switch (startPhase) {
     case 0:
       // No start phase, just start the competition right away
