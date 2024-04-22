@@ -396,11 +396,13 @@ void pingPong(){  // MARK: PINGPONG
 
 void setup() {  //MARK: SETUP
 
+  tone(buzzer, 0, 0); // turn off the buzzer
+
   for (int i = 0; i < numGroups; i++) { // fill the list of groups with the numbers 1 to numGroups [1,2,3,...,numGroups]
     listOfGroups[i] = i+1;
   } 
 
-  delay(500);            // for recovery
+  //delay(500);            // for recovery
   clock1.begin();        // initialize NeoPixel strip object
   clock1.clear();        // clear all registers from previous entries
   clock1.show();         // display the cleared registers
@@ -434,6 +436,8 @@ void setup() {  //MARK: SETUP
 
 // End ESP-NOW setup
 
+  sentID(9999);   // forces all RX to reboot
+  delay(500);     // waits for the RX to reboot
 
   pinMode(FFWbutton, INPUT_PULLUP);   // both buttons are connected to GROUND (not VCC) and pulled up with internal pullup resistors
   pinMode(Holdbutton, INPUT_PULLUP);
