@@ -113,39 +113,37 @@ void sentID(int id) {
 }
 
 void checkButtons(){  // MARK: CHECKBUTTONS
-  int debounceDuration = 50;
+  int oldHoldState = HoldState;
+  int oldFFWState = FFWState;
+  int debounceDuration = 300;
+  static unsigned long lastFFWButtonPress = 0;
+  static unsigned long lastHoldButtonPress = 0;
 
-  if (!digitalRead(FFWbutton) && HoldState == false) {
-    while (!digitalRead(FFWbutton)) {
-      delay(debounceDuration);
-    }
-    delay(debounceDuration);
-
-    if (FFWState == false){
-      FFWState = true;
-    } else {
-      FFWState = false;
-    }
-    //Serial.print("FFWbutton pressed, FFWState: ");
-    //Serial.println(FFWState);
-    sentID(1234);
+  if (!digitalRead(FFWbutton) && HoldState == false && (millis() - lastFFWButtonPress) > debounceDuration) {
+    lastFFWButtonPress = millis();
+    FFWState = !FFWState;
   }
 
-  if (!digitalRead(Holdbutton)) {
-    while (!digitalRead(Holdbutton)) {
-      delay(debounceDuration);
-    }
-    delay(debounceDuration);
-
-    if (HoldState == false){
-      HoldState = true;
-    } else {
-      HoldState = false;
-    }
-    //Serial.print("Holdbutton pressed, HoldState: ");
-    //Serial.println(HoldState);
-    sentID(2314);
+  if (!digitalRead(Holdbutton) && (millis() - lastHoldButtonPress) > debounceDuration) {
+    lastHoldButtonPress = millis();
+    HoldState = !HoldState;
   }
+
+  if (HoldState != oldHoldState) {
+    if (HoldState == true){
+      sentID(1110);
+    }else{
+      sentID(1111);
+    }
+  }
+
+  if(FFWState != oldFFWState)
+    if (FFWState == true){
+      sentID(2220);
+    }else{
+      //sentID(2221);
+  }
+
 }
 
 void buzz(int toneID){   // MARK: BUZZ
