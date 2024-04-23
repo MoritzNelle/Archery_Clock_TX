@@ -47,7 +47,7 @@ unsigned int colorOfGroups[4] = {0, 21845, 10922, 43681};  // group 1/A: red, gr
 int colorOfTimer              = 21845;  // green //enter color in HSV format (0-65535);
 int colorOfGetToLine          = 43681;  // blue  //enter color in HSV format (0-65535);
 int warningColor              = 5000;
-int warningSec                = 10;     // time in seconds before the end of the shooting phase when the warning color is displayed       
+int warningSec                = 15;     // time in seconds before the end of the shooting phase when the warning color is displayed       
 #define NUM_PIXELS              72
 float numLedGroupIndication =   2;
 float numLedNextGroup      =    1;
@@ -195,6 +195,7 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
   float durationPerLed = msDuration / numLeds; // calculate the duration per LED
   unsigned long timeElapsed = 0; // initialize the elapsed time
   int oldPixel = firstPixel;
+  bool warningState = false;
 
   unsigned long startTime = millis(); // get the current time
   
@@ -211,8 +212,10 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
     startTime = millis() - timeElapsed;
   }
     
-    if (warning == true && timeElapsed > msDuration - warningSec * 1000) {
+    if (warning == true && timeElapsed > msDuration - warningSec * 1000 && warningState == false) {
       color = warningColor;
+      buzz(1);
+      warningState = true;
     }
   
     int currentLastPixel = lastPixel - (timeElapsed/durationPerLed) + 1; // calculate the current last pixel
