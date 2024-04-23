@@ -190,54 +190,56 @@ void buzz(int toneID){   // MARK: BUZZ
 }
 
 void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float duration, bool warning){ // MARK: COUNTDOWN
+  unsigned long msDuration = duration * 1000; // convert seconds to milliseconds
+  int numLeds = lastPixel - firstPixel + 1; // calculate the number of LEDs
+  float durationPerLed = msDuration / numLeds; // calculate the duration per LED
+  unsigned long timeElapsed = 0; // initialize the elapsed time
+  int oldPixel = firstPixel;
 
-  float iterations = log(maxBrightness) / log(1.05);
-  float numPixels = lastPixel - firstPixel;
-  float fadeDelay = (duration*1000 / iterations)/numPixels; // delay for each brightness level; 1/numLedGroupIndication = 0 ... WHY?
-  fadeDelay = fadeDelay * fadeDelayCorrection;
+  unsigned long startTime = millis(); // get the current time
+  
+  while (timeElapsed < msDuration && !FFWState){
 
-  int warningPixel = (numPixels/duration * warningSec);
-  //Serial.print("warningPixel: ");Serial.println(warningPixel);
+  checkButtons();
 
-  for (int i = firstPixel; i <= lastPixel; i++) {
-    clock1.setPixelColor(i, clock1.ColorHSV(color, 255, maxBrightness));
+  while(HoldState == true){ // hold the countdown, if the hold button is pressed; until the hold button is pressed again
+    checkButtons();
   }
-  clock1.show();
-
-  for (int i = lastPixel; i >= firstPixel; i--) {
-
-    if (warning == true && i == warningPixel) {
-      for (int j = i; j >= firstPixel; j--) {
-        clock1.setPixelColor(j, clock1.ColorHSV(warningColor, 255, maxBrightness));
-      }
-      clock1.show();
+  
+  // Update the start time when exiting the hold state
+  if (HoldState == false) {
+    startTime = millis() - timeElapsed;
+  }
+    
+    if (warning == true && timeElapsed > msDuration - warningSec * 1000) {
       color = warningColor;
     }
+  
+    int currentLastPixel = lastPixel - (timeElapsed/durationPerLed) + 1; // calculate the current last pixel
+  
+    for (int i = firstPixel; i < currentLastPixel; i++) { // turn on the LEDs that are (still) part of the countdown
+      clock1.setPixelColor(i, clock1.ColorHSV(color, 255, maxBrightness)); // set the color of the LED
+    }
 
-    for (float brightness = maxBrightness; brightness > 1; brightness = brightness / 1.05) {
-      clock1.setPixelColor(i, clock1.ColorHSV(color, 255, brightness));
-      clock1.show();
-
-    unsigned long startTime = millis();
-      while(millis() - startTime < fadeDelay) {
-        checkButtons();
-      }
-    
-      checkButtons();
-      while (HoldState==true)
-      {
-        checkButtons();
-      }
-
-      if (FFWState==true)
-      {
-        FFWState = false;
-        return;
-      }
-  }
-    clock1.setPixelColor(i, clock1.Color(0, 0, 0)); // set LED color to off
+    for (int i = currentLastPixel; i < numLeds + numLedGap; i++) {    // turn off the LEDs that are not part of the countdown anymore + the gap between the countdown and the group indication
+      clock1.setPixelColor(i, clock1.ColorHSV(0, 255, 0));
+    }
+        
+    float remainingTime = durationPerLed - (timeElapsed % (unsigned long)durationPerLed);    // calculate the remaining time for the current LED
+    float brightness = maxBrightness * exp(-3 * (1 - remainingTime / durationPerLed));    // calculate the brightness based on the remaining time
+    clock1.setPixelColor(currentLastPixel, clock1.ColorHSV(color, 255, brightness));    // set the brightness of the current LED
+  
     clock1.show();
-  }  
+    delayMicroseconds(50000); // catch edge cases. Does not influence the duration, only the refresh rate
+  
+    Serial.print(currentLastPixel);
+    Serial.print("\t");
+    Serial.println(brightness);
+  
+    timeElapsed = millis() - startTime; // calculate the elapsed time
+
+  }
+  FFWState = false;
 }
 
 void fade(int color){                                                   // can not be skipped nor hold, this is by design!!!
