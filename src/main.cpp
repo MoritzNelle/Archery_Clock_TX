@@ -28,7 +28,7 @@
 #define timePerArrow   30    // time per arrow in seconds
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
 #define numGroups        4     // min. 1, max 4 groups
-float maxBrightness   =  20;   // 2(!)-255 (2 = lowest, 255 = full brightness)
+float maxBrightness   =  10;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 #define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 //TONE VARIABLES (meant to be changed by the user)
@@ -48,16 +48,17 @@ int colorOfTimer              = 21845;  // green //enter color in HSV format (0-
 int colorOfGetToLine          = 43681;  // blue  //enter color in HSV format (0-65535);
 int warningColor              = 5000;
 int warningSec                = 10;     // time in seconds before the end of the shooting phase when the warning color is displayed       
-#define NUM_PIXELS              60
+#define NUM_PIXELS              72
 float numLedGroupIndication =   2;
 float numLedNextGroup      =    1;
 #define numLedGap               1
 int numLedTimer = NUM_PIXELS - numLedGroupIndication - numLedNextGroup - numLedGap -1;
 int listOfGroups[numGroups];
 
-uint8_t receiverAddresses[][6] = {  // MAC addresses of the receivers
+uint8_t receiverAddresses[][6] = {  // MAC addresses of the receivers //MARK:SLAVE-MAC
   {0x30, 0xc6, 0xf7, 0x30, 0x21, 0x5c},
   {0xc8, 0xc9, 0xa3, 0xc9, 0x61, 0xcc},
+  {0xB0, 0xB2, 0x1C, 0xA8, 0x1B, 0xF0}
 };
 
 
@@ -85,10 +86,10 @@ structTX TXdata;
 esp_now_peer_info_t peerInfo[sizeof(receiverAddresses) / sizeof(receiverAddresses[0])]; // Adjust the size of the array based on the number of receivers
 
 // MARK: PINS
-#define LEDPIN      16             // 
+#define LEDPIN      14             // 
 #define FFWbutton   22             // all GPIO pins can be used
-#define Holdbutton 23              // all GPIO pins can be used
-#define buzzer 14
+#define Holdbutton  23             // all GPIO pins can be used
+#define buzzer      13             // all GPIO pins can be used
 
 Adafruit_NeoPixel clock1(NUM_PIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
 
