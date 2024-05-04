@@ -14,7 +14,14 @@
  * 3. Compile and upload the program to the Arduino.
  * 
  * Usage:
- * The program runs automatically once uploaded. It controls the LED strip to display timing and group information. Adjust colors and timings in `main.cpp`. Don't touch the other variables unless you know what you're doing.*/
+ * The program runs automatically once uploaded. It controls the LED strip to display timing and group information. Adjust colors and timings in `main.cpp`. Don't touch the other variables unless you know what you're doing.
+ * 
+ * Bugs to fix:
+ * - Group order (AB, CD ,...?)
+ * - Button debounce (latchet mechanism)
+ * - acasional flickering during the countdown (adapt the delayMicroseconds(50000) function)
+ * 
+ * */
 
 #include <Arduino.h>              // only needed if you are using PlatformIO, the Arduino IDE already includes this library by defualt in the background
 #include <Adafruit_NeoPixel.h>    // include the Adafruit NeoPixel library, alternative to the FastLED library
@@ -28,7 +35,7 @@
 #define timePerArrow   30    // time per arrow in seconds
 #define secGetToLine    10    // time to get to the shootingline before the shooting starts
 #define numGroups        4     // min. 1, max 4 groups
-float maxBrightness   =  10;   // 2(!)-255 (2 = lowest, 255 = full brightness)
+float maxBrightness   =  30;   // 2(!)-255 (2 = lowest, 255 = full brightness)
 #define startPhase       3     // 0: no start phase (R/B/G); 1: checkColors + hold; 2: hold; 3: pingPong + hold
 
 //TONE VARIABLES (meant to be changed by the user)
@@ -48,7 +55,7 @@ int colorOfTimer              = 21845;  // green //enter color in HSV format (0-
 int colorOfGetToLine          = 43681;  // blue  //enter color in HSV format (0-65535);
 int warningColor              = 5000;
 int warningSec                = 15;     // time in seconds before the end of the shooting phase when the warning color is displayed       
-#define NUM_PIXELS              72
+#define NUM_PIXELS              18
 float numLedGroupIndication =   2;
 float numLedNextGroup      =    1;
 #define numLedGap               1
@@ -58,7 +65,9 @@ int listOfGroups[numGroups];
 uint8_t receiverAddresses[][6] = {  // MAC addresses of the receivers //MARK:SLAVE-MAC
   {0x30, 0xc6, 0xf7, 0x30, 0x21, 0x5c},
   {0xc8, 0xc9, 0xa3, 0xc9, 0x61, 0xcc},
-  {0xB0, 0xB2, 0x1C, 0xA8, 0x1B, 0xF0}
+  //{0xB0, 0xB2, 0x1C, 0xA8, 0x1B, 0xF0},
+  {0x30, 0xc6, 0xf7, 0x30, 0x2b, 0xC4},
+  {0x30, 0xc6, 0xf7, 0x30, 0x27, 0x94}
 };
 
 
@@ -87,8 +96,8 @@ esp_now_peer_info_t peerInfo[sizeof(receiverAddresses) / sizeof(receiverAddresse
 
 // MARK: PINS
 #define LEDPIN      14             // 
-#define FFWbutton   22             // all GPIO pins can be used
-#define Holdbutton  23             // all GPIO pins can be used
+#define FFWbutton   33             // all GPIO pins can be used
+#define Holdbutton  32             // all GPIO pins can be used
 #define buzzer      13             // all GPIO pins can be used
 
 Adafruit_NeoPixel clock1(NUM_PIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
@@ -97,7 +106,7 @@ Adafruit_NeoPixel clock1(NUM_PIXELS, LEDPIN, NEO_GRB + NEO_KHZ800);
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {    // Callback function called when data is sent
   // Serial.print("\r\nLast Packet Send Status:\t");
-  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  Serial.print(status == ESP_NOW_SEND_SUCCESS ? " True" : " False");
 }
 
 void sentID(int id) {
@@ -110,7 +119,7 @@ void sentID(int id) {
       // Serial.println("Error sending the data");
     }
   }
-  Serial.print("ID sent: "); Serial.println(TXdata.a);
+  Serial.print("\n"); Serial.print("ID sent: "); Serial.print(TXdata.a);
 }
 
 void checkButtons(){  // MARK: CHECKBUTTONS
@@ -235,9 +244,9 @@ void countDown(float firstPixel, float lastPixel, int color /*HSV*/ ,float durat
     clock1.show();
     delayMicroseconds(50000); // catch edge cases. Does not influence the duration, only the refresh rate
   
-    Serial.print(currentLastPixel);
-    Serial.print("\t");
-    Serial.println(brightness);
+    //Serial.print(currentLastPixel);
+    //Serial.print("\t");
+    //Serial.println(brightness);
   
     timeElapsed = millis() - startTime; // calculate the elapsed time
 
