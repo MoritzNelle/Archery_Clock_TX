@@ -4,6 +4,14 @@
 // Define the pin and number of LEDs
 #define NUM_LEDS   75
 
+// Competition variables
+int prac_rounds = 2;  // Number of Practice rounds (0 - 5 #)
+int comp_rounds = 5; // Number of Competition Rounds (0 - 20 #)
+int time_round  = 10; // Time per Round (10 - 210 s)
+int time_line   = 10; // Get to the line (0 - 30 s)
+int num_groups  = 4;  // Number of Archer Groups (1-4)
+int brightness  = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
+
 // Define the MAC addresses of the receivers
 const uint8_t peerAddresses[][6] = {
   {0x30, 0xc6, 0xf7, 0x30, 0x21, 0x5c},
@@ -35,8 +43,6 @@ void setup() {
 
   // Set device as a Wi-Fi Station
   WiFi.mode(WIFI_STA);
-
-  //TODO: print extensive debugging information to Serial Monitor 
 
   // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -85,33 +91,67 @@ void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBrea
   }
 }
 
+void updateLedStrip(uint8_t group, float progress, bool isShooting) {
+  uint8_t ledColors[NUM_LEDS][3] = {0};
+
+  // Set the top LEDs to indicate the current group
+  for (int i = 0; i < num_groups; i++) {
+    if (i == group) {
+      ledColors[NUM_LEDS - 1 - i][0] = 255; // Red for the current group
+    } else {
+      ledColors[NUM_LEDS - 1 - i][1] = 255; // Green for other groups
+    }
+  }
+
+  // Set the LEDs to indicate the progress
+  int activeLeds = (1.0 - progress) * (NUM_LEDS - num_groups);
+  for (int i = 0; i < activeLeds; i++) {
+    if (isShooting) {
+      ledColors[i][2] = 255; // Blue for shooting time
+    } else {
+      ledColors[i][0] = 255; // Red for getting to the line
+    }
+  }
+
+  sendData(0, 100, 50, 5, ledColors);
+}
+
 void loop() {
+  static int currentRound             = 0;
+  static int currentGroup             = 0;
+  static unsigned long roundStartTime = 0;
+  static bool isShooting              = false;
+  static bool isPractice              = true;
+  static unsigned long lastUpdateTime = 0;
+  const unsigned long updateInterval  = 250; // Update interval in milliseconds
 
-  // Change color
-  uint8_t ledColors[NUM_LEDS][3];
+  unsigned long currentTime = millis();
 
-  for (int i = 0; i < NUM_LEDS; i++) {
-    ledColors[i][0] = 0;
-    ledColors[i][1] = 0;
-    ledColors[i][2] = 255;
+  if (currentRound < prac_rounds + comp_rounds) {
+    if (currentTime - roundStartTime >= (isShooting ? time_round : time_line) * 1000) {
+      if (isShooting) {
+        currentGroup++;
+        if (currentGroup >= num_groups) {
+          currentGroup = 0;
+          currentRound++;
+          isPractice = currentRound < prac_rounds;
+        }
+      }
+      isShooting = !isShooting;
+      roundStartTime = currentTime;
+    }
+
+    if (currentTime - lastUpdateTime >= updateInterval) {
+      lastUpdateTime = currentTime;
+      float progress = (float)(currentTime - roundStartTime) / ((isShooting ? time_round : time_line) * 1000);
+      updateLedStrip(currentGroup, progress, isShooting);
+    }
+  } else {
+    // Indicate that archers can collect their arrows
+    uint8_t ledColors[NUM_LEDS][3] = {0};
+    for (int i = 0; i < NUM_LEDS; i++) {
+      ledColors[i][1] = 255; // Green to indicate collection time
+    }
+    sendData(1, 100, 50, 5, ledColors);
   }
-
-  sendData(1, 100, 220, 5, ledColors);
-
-  delay(5000);
-
-
-
-
-
-  for (int i = 0; i < NUM_LEDS; i++) {
-    ledColors[i][0] = 0;
-    ledColors[i][1] = 255;
-    ledColors[i][2] = 0;
-  }
-
-  sendData(0, 0, 0, 0, ledColors);
-
-  delay(5000);
-  
 }
