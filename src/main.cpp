@@ -1,16 +1,23 @@
 #include <esp_now.h>
 #include <WiFi.h>
 
-// Define the pin and number of LEDs
-#define NUM_LEDS   75
-
 // Competition variables
 int prac_rounds = 2;  // Number of Practice rounds (0 - 5 #)
 int comp_rounds = 5; // Number of Competition Rounds (0 - 20 #)
 int time_round  = 10; // Time per Round (10 - 210 s)
-int time_line   = 10; // Get to the line (0 - 30 s)
+int time_line   = 5; // Get to the line (0 - 30 s)
 int num_groups  = 4;  // Number of Archer Groups (1-4)
 int brightness  = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
+
+// Pin Definitions
+#define FFW_Button1     14
+#define FFW_Button2     27
+#define HLD_UP_Button   13
+#define STP_DWN_Button  12
+#define BUZZER          25
+
+// Definitions
+#define NUM_LEDS   75
 
 // Define the MAC addresses of the receivers
 const uint8_t peerAddresses[][6] = {
@@ -89,22 +96,40 @@ void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBrea
       Serial.println(i);
     }
   }
+
+  // Sound the internal buzzer
+  for (int i = 0; i < numBuzzerBeeps; i++) {
+    tone(BUZZER, buzzerPitch, buzzerDuration);
+    delay(buzzerDuration + buzzerBreak);
+  }
 }
 
 void updateLedStrip(uint8_t group, float progress, bool isShooting) {
   uint8_t ledColors[NUM_LEDS][3] = {0};
 
-  // Set the top LEDs to indicate the current group
-  for (int i = 0; i < num_groups; i++) {
-    if (i == group) {
-      ledColors[NUM_LEDS - 1 - i][0] = 255; // Red for the current group
-    } else {
-      ledColors[NUM_LEDS - 1 - i][1] = 255; // Green for other groups
-    }
+  // Define colors for the groups
+  uint8_t groupColors[4][3] = {
+    {255, 0, 0},   // Red
+    {0, 255, 0},   // Green
+    {0, 0, 255},   // Blue
+    {255, 255, 0}  // Yellow
+  };
+
+  // Set the top LED to indicate the upcoming group
+  uint8_t nextGroup = (group + 1) % num_groups;
+  ledColors[NUM_LEDS - 1][0] = groupColors[nextGroup][0];
+  ledColors[NUM_LEDS - 1][1] = groupColors[nextGroup][1];
+  ledColors[NUM_LEDS - 1][2] = groupColors[nextGroup][2];
+
+  // Set the three LEDs below the top LED to indicate the current group
+  for (int i = 0; i < 3; i++) {
+    ledColors[NUM_LEDS - 2 - i][0] = groupColors[group][0];
+    ledColors[NUM_LEDS - 2 - i][1] = groupColors[group][1];
+    ledColors[NUM_LEDS - 2 - i][2] = groupColors[group][2];
   }
 
   // Set the LEDs to indicate the progress
-  int activeLeds = (1.0 - progress) * (NUM_LEDS - num_groups);
+  int activeLeds = (1.0 - progress) * (NUM_LEDS - num_groups - 3);
   for (int i = 0; i < activeLeds; i++) {
     if (isShooting) {
       ledColors[i][2] = 255; // Blue for shooting time
@@ -113,17 +138,17 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
     }
   }
 
-  sendData(0, 100, 50, 5, ledColors);
+  sendData(0, 100, 50, 5, ledColors); // Adjust the buzzer parameters as needed
 }
 
 void loop() {
-  static int currentRound             = 0;
-  static int currentGroup             = 0;
+  static int currentRound = 0;
+  static int currentGroup = 0;
   static unsigned long roundStartTime = 0;
-  static bool isShooting              = false;
-  static bool isPractice              = true;
+  static bool isShooting = false;
+  static bool isPractice = true;
   static unsigned long lastUpdateTime = 0;
-  const unsigned long updateInterval  = 250; // Update interval in milliseconds
+  const unsigned long updateInterval = 1000; // Update interval in milliseconds
 
   unsigned long currentTime = millis();
 
@@ -139,6 +164,10 @@ void loop() {
       }
       isShooting = !isShooting;
       roundStartTime = currentTime;
+
+      // Sound the buzzer at the beginning of each phase
+      tone(BUZZER, 1000, 500); // Adjust the frequency and duration as needed
+      delay(500); // Wait for the buzzer to finish
     }
 
     if (currentTime - lastUpdateTime >= updateInterval) {
@@ -152,6 +181,6 @@ void loop() {
     for (int i = 0; i < NUM_LEDS; i++) {
       ledColors[i][1] = 255; // Green to indicate collection time
     }
-    sendData(1, 100, 50, 5, ledColors);
+    sendData(0, 100, 50, 5, ledColors);
   }
 }
