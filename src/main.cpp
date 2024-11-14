@@ -20,7 +20,7 @@ int brightness  = 10; // Clocks LED brightness (1-10) # TODO: Implement brightne
 #define SCL             19
 
 // Definitions
-#define NUM_LEDS   75
+#define NUM_LEDS        75
 
 // Create an instance of the U8G2 display with SH1106 driver
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);
@@ -44,10 +44,45 @@ typedef struct {
 
 DataPackage dataToSend;
 
+// Button states
+volatile bool ffwPressed = false;
+volatile bool holdPressed = false;
+volatile bool stopPressed = false;
+
+// Debounce variables
+volatile unsigned long lastFFWPress = 0;
+volatile unsigned long lastHoldPress = 0;
+volatile unsigned long lastStopPress = 0;
+const unsigned long debounceDelay = 50; // Debounce delay in milliseconds
+
 // Callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   Serial.print("\r\nLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+
+void IRAM_ATTR handleFFWPress() {
+  unsigned long currentTime = millis();
+  if (currentTime - lastFFWPress > debounceDelay) {
+    ffwPressed = true;
+    lastFFWPress = currentTime;
+  }
+}
+
+void IRAM_ATTR handleHoldPress() {
+  unsigned long currentTime = millis();
+  if (currentTime - lastHoldPress > debounceDelay) {
+    holdPressed = true;
+    lastHoldPress = currentTime;
+  }
+}
+
+void IRAM_ATTR handleStopPress() {
+  unsigned long currentTime = millis();
+  if (currentTime - lastStopPress > debounceDelay) {
+    stopPressed = true;
+    lastStopPress = currentTime;
+  }
 }
 
 void setup() {
@@ -83,9 +118,14 @@ void setup() {
   }
 
   // Set button pins as input
-  pinMode(FFW_Button, INPUT);
-  pinMode(HLD_UP_Button, INPUT);
-  pinMode(STP_DWN_Button, INPUT);
+  pinMode(FFW_Button, INPUT_PULLUP);
+  pinMode(HLD_UP_Button, INPUT_PULLUP);
+  pinMode(STP_DWN_Button, INPUT_PULLUP);
+
+  // Attach interrupts to buttons
+  attachInterrupt(digitalPinToInterrupt(FFW_Button), handleFFWPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(HLD_UP_Button), handleHoldPress, RISING);
+  attachInterrupt(digitalPinToInterrupt(STP_DWN_Button), handleStopPress, RISING);
 }
 
 void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
@@ -139,6 +179,37 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
   sendData(0, 100, 50, 5, ledColors); // Adjust the buzzer parameters as needed
 }
 
+// Define the colors for each group
+const char* groupColors[] = {"Red", "Green", "Blue", "Yellow"};
+
+void enterCollectArrowsPhase() {
+  // Indicate that archers can collect their arrows
+  uint8_t ledColors[NUM_LEDS][3] = {0};
+  for (int i = 0; i < NUM_LEDS; i++) {
+    ledColors[i][1] = 255; // Green to indicate collection time
+  }
+  sendData(3, 100, 50, 5, ledColors);
+
+  // Update the display to show collection phase
+  // u8g2.clearBuffer();
+  // u8g2.setFont(u8g2_font_ncenB08_tr);
+  u8g2.drawBox(0, 27, 128, 36);
+
+  u8g2.setDrawColor(0); // Set draw color to background color
+  u8g2.setCursor(8, 42);
+  u8g2.print("Phase: Collect arrows");
+  u8g2.setCursor(4, 57);
+  u8g2.print("Press FFW to continue");
+  u8g2.sendBuffer();
+  u8g2.setDrawColor(1); // Set draw color back to foreground color
+
+  // Stay in the collect arrows phase until the FFW button is pressed
+  while (!ffwPressed) {
+    delay(10);
+  }
+  ffwPressed = false;
+}
+
 void loop() {
   static int currentRound = 0;
   static int currentGroup = 0;
@@ -150,20 +221,44 @@ void loop() {
 
   unsigned long currentTime = millis();
 
+  if (ffwPressed) {
+    ffwPressed = false;
+    isShooting = !isShooting;
+    roundStartTime = currentTime;
+  }
+
+  if (holdPressed) {
+    holdPressed = false;
+    while (!ffwPressed) {
+      delay(10); // Hold the loop
+    }
+    ffwPressed = false;
+  }
+
+  if (stopPressed) {
+    stopPressed = false;
+    // Implement stop functionality if needed
+  }
+
   if (currentRound < prac_rounds + comp_rounds) {
+    // Check if the current phase time has elapsed
     if (currentTime - roundStartTime >= (isShooting ? time_round : time_line) * 1000) {
-      if (isShooting) { 
+      if (isShooting) {
         currentGroup++;
         if (currentGroup >= num_groups) {
           currentGroup = 0;
           currentRound++;
           isPractice = currentRound < prac_rounds;
+
+          // Enter "collect your arrows" phase
+          enterCollectArrowsPhase();
         }
       }
       isShooting = !isShooting;
       roundStartTime = currentTime;
     }
 
+    // Update the display and LED strip at regular intervals
     if (currentTime - lastUpdateTime >= updateInterval) {
       lastUpdateTime = currentTime;
       float progress = (float)(currentTime - roundStartTime) / ((isShooting ? time_round : time_line) * 1000);
@@ -171,24 +266,23 @@ void loop() {
 
       // Update the display
       u8g2.clearBuffer();
-      u8g2.setFont(u8g2_font_ncenB08_tr);
+      u8g2.setFont(u8g2_font_helvB08_tr); // Use a sans-serif font
 
       // Display current round
-      u8g2.setCursor(0, 10);
+      u8g2.setCursor(0, 8);
       if (isPractice) {
         u8g2.printf("P%d/%d", currentRound + 1, prac_rounds);
       } else {
         u8g2.printf("R%d/%d", currentRound - prac_rounds + 1, comp_rounds);
       }
+      u8g2.printf("  (Group: %d/%d)", currentGroup + 1, num_groups); // Display current and next group with colors
 
-      // Display current and next group
-      u8g2.setCursor(0, 20);
-      u8g2.printf("Current Group: %d", currentGroup);
-      u8g2.setCursor(0, 30);
-      u8g2.printf("Next Group: %d", (currentGroup + 1) % num_groups);
+      // Display current shooting phase
+      u8g2.setCursor(0, 22);
+      u8g2.printf("Shooting: %s->%s", groupColors[currentGroup], groupColors[(currentGroup + 1) % num_groups]); // Display current and next group with colors
 
       // Display current phase
-      u8g2.setCursor(0, 40);
+      u8g2.setCursor(0, 36);
       if (isShooting) {
         u8g2.print("Phase: Shoot");
       } else {
@@ -198,27 +292,16 @@ void loop() {
       // Display remaining time and progress bar
       int remainingTime = ((isShooting ? time_round : time_line) * 1000) - (currentTime - roundStartTime);
       u8g2.setCursor(0, 50);
-      u8g2.printf("Time: %d s", remainingTime / 1000);
+      u8g2.printf("Time: %d/%d s", remainingTime / 1000, (isShooting ? time_round : time_line));
 
       int progressBarWidth = (int)(progress * 128);
-      u8g2.drawFrame(0, 54, 128, 10);
-      u8g2.drawBox(0, 54, progressBarWidth, 10);
+      u8g2.drawFrame(0, 52, 128, 12);
+      u8g2.drawBox(0, 52, progressBarWidth, 12);
 
       u8g2.sendBuffer();
     }
   } else {
-    // Indicate that archers can collect their arrows
-    uint8_t ledColors[NUM_LEDS][3] = {0};
-    for (int i = 0; i < NUM_LEDS; i++) {
-      ledColors[i][1] = 255; // Green to indicate collection time
-    }
-    sendData(3, 100, 50, 5, ledColors);
-
-    // Update the display to show collection phase
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB08_tr);
-    u8g2.setCursor(0, 0);
-    u8g2.print("Phase: Collect arrows");
-    u8g2.sendBuffer();
+    // Enter "collect your arrows" phase after all rounds are completed
+    enterCollectArrowsPhase();
   }
 }
