@@ -1,5 +1,7 @@
 #include <esp_now.h>
 #include <WiFi.h>
+#include <Wire.h>
+#include <U8g2lib.h>
 
 // Competition variables
 int prac_rounds = 2;  // Number of Practice rounds (0 - 5 #)
@@ -10,14 +12,18 @@ int num_groups  = 4;  // Number of Archer Groups (1-4)
 int brightness  = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
 
 // Pin Definitions
-#define FFW_Button1     14
-#define FFW_Button2     27
+#define FFW_Button      14
 #define HLD_UP_Button   13
 #define STP_DWN_Button  12
 #define BUZZER          25
+#define SDA             18
+#define SCL             19
 
 // Definitions
 #define NUM_LEDS   75
+
+// Create an instance of the U8G2 display with SH1106 driver
+U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);
 
 // Define the MAC addresses of the receivers
 const uint8_t peerAddresses[][6] = {
@@ -45,11 +51,12 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void setup() {
-  // Initialize Serial Monitor
-  Serial.begin(115200);
+  Serial.begin(115200);  // Initialize Serial Monitor
 
-  // Set device as a Wi-Fi Station
-  WiFi.mode(WIFI_STA);
+  Wire.begin(SDA, SCL);  // Initialize the I2C communication with specified SDA and SCL pins
+  u8g2.begin();  // Initialize the OLED display
+
+  WiFi.mode(WIFI_STA);  // Set device as a Wi-Fi Station
 
   // Init ESP-NOW
   if (esp_now_init() != ESP_OK) {
@@ -74,6 +81,11 @@ void setup() {
       return;
     }
   }
+
+  // Set button pins as input
+  pinMode(FFW_Button, INPUT);
+  pinMode(HLD_UP_Button, INPUT);
+  pinMode(STP_DWN_Button, INPUT);
 }
 
 void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
@@ -87,20 +99,6 @@ void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBrea
   // Send data to all peers
   for (int i = 0; i < sizeof(peerAddresses) / sizeof(peerAddresses[0]); i++) {
     esp_err_t result = esp_now_send(peerAddresses[i], (uint8_t *) &dataToSend, sizeof(dataToSend));
-
-    if (result == ESP_OK) {
-      Serial.print("Sent with success to peer ");
-      Serial.println(i);
-    } else {
-      Serial.print("Error sending the data to peer ");
-      Serial.println(i);
-    }
-  }
-
-  // Sound the internal buzzer
-  for (int i = 0; i < numBuzzerBeeps; i++) {
-    tone(BUZZER, buzzerPitch, buzzerDuration);
-    delay(buzzerDuration + buzzerBreak);
   }
 }
 
@@ -154,7 +152,7 @@ void loop() {
 
   if (currentRound < prac_rounds + comp_rounds) {
     if (currentTime - roundStartTime >= (isShooting ? time_round : time_line) * 1000) {
-      if (isShooting) {
+      if (isShooting) { 
         currentGroup++;
         if (currentGroup >= num_groups) {
           currentGroup = 0;
@@ -164,16 +162,49 @@ void loop() {
       }
       isShooting = !isShooting;
       roundStartTime = currentTime;
-
-      // Sound the buzzer at the beginning of each phase
-      tone(BUZZER, 1000, 500); // Adjust the frequency and duration as needed
-      delay(500); // Wait for the buzzer to finish
     }
 
     if (currentTime - lastUpdateTime >= updateInterval) {
       lastUpdateTime = currentTime;
       float progress = (float)(currentTime - roundStartTime) / ((isShooting ? time_round : time_line) * 1000);
       updateLedStrip(currentGroup, progress, isShooting);
+
+      // Update the display
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_ncenB08_tr);
+
+      // Display current round
+      u8g2.setCursor(0, 10);
+      if (isPractice) {
+        u8g2.printf("P%d/%d", currentRound + 1, prac_rounds);
+      } else {
+        u8g2.printf("R%d/%d", currentRound - prac_rounds + 1, comp_rounds);
+      }
+
+      // Display current and next group
+      u8g2.setCursor(0, 20);
+      u8g2.printf("Current Group: %d", currentGroup);
+      u8g2.setCursor(0, 30);
+      u8g2.printf("Next Group: %d", (currentGroup + 1) % num_groups);
+
+      // Display current phase
+      u8g2.setCursor(0, 40);
+      if (isShooting) {
+        u8g2.print("Phase: Shoot");
+      } else {
+        u8g2.print("Phase: To the line");
+      }
+
+      // Display remaining time and progress bar
+      int remainingTime = ((isShooting ? time_round : time_line) * 1000) - (currentTime - roundStartTime);
+      u8g2.setCursor(0, 50);
+      u8g2.printf("Time: %d s", remainingTime / 1000);
+
+      int progressBarWidth = (int)(progress * 128);
+      u8g2.drawFrame(0, 54, 128, 10);
+      u8g2.drawBox(0, 54, progressBarWidth, 10);
+
+      u8g2.sendBuffer();
     }
   } else {
     // Indicate that archers can collect their arrows
@@ -181,6 +212,13 @@ void loop() {
     for (int i = 0; i < NUM_LEDS; i++) {
       ledColors[i][1] = 255; // Green to indicate collection time
     }
-    sendData(0, 100, 50, 5, ledColors);
+    sendData(3, 100, 50, 5, ledColors);
+
+    // Update the display to show collection phase
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_ncenB08_tr);
+    u8g2.setCursor(0, 0);
+    u8g2.print("Phase: Collect arrows");
+    u8g2.sendBuffer();
   }
 }
