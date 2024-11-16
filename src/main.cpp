@@ -4,12 +4,13 @@
 #include <U8g2lib.h>
 
 // Competition variables
-int prac_rounds = 2;  // Number of Practice rounds (0 - 5 #)
-int comp_rounds = 5; // Number of Competition Rounds (0 - 20 #)
-int time_round  = 10; // Time per Round (10 - 210 s)
-int time_line   = 5; // Get to the line (0 - 30 s)
-int num_groups  = 4;  // Number of Archer Groups (1-4)
-int brightness  = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
+int prac_rounds     = 2;  // Number of Practice rounds (0 - 5 #)
+int comp_rounds     = 5; // Number of Competition Rounds (0 - 20 #)
+int time_round      = 10; // Time per Round (10 - 210 s)
+int time_line       = 5; // Get to the line (0 - 30 s)
+int num_groups      = 4;  // Number of Archer Groups (1-4)
+int user_brightness = 3; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
+
 
 // Pin Definitions
 #define FFW_Button      14
@@ -128,18 +129,54 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(STP_DWN_Button), handleStopPress, RISING);
 }
 
-void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
-  // Prepare data to send
-  dataToSend.numBuzzerBeeps = numBuzzerBeeps;
-  dataToSend.buzzerDuration = buzzerDuration;
-  dataToSend.buzzerBreak = buzzerBreak;
-  dataToSend.buzzerPitch = buzzerPitch;
-  memcpy(dataToSend.ledColors, ledColors, sizeof(dataToSend.ledColors));
+int mapBrightness(int user_brightness) {
+    switch (user_brightness) {
+        case 1:
+            return 1;    // ~0.4%
+        case 2:
+            return 5;    // ~2%
+        case 3:
+            return 10;   // ~4%
+        case 4:
+            return 20;   // ~8%
+        case 5:
+            return 40;   // ~16%
+        case 6:
+            return 70;   // ~27%
+        case 7:
+            return 110;  // ~43%
+        case 8:
+            return 150;  // ~59%
+        case 9:
+            return 200;  // ~78%
+        case 10:
+            return 255;  // 100%
+        default:
+            return 255;  // Default full brightness
+    }
+}
 
-  // Send data to all peers
-  for (int i = 0; i < sizeof(peerAddresses) / sizeof(peerAddresses[0]); i++) {
-    esp_err_t result = esp_now_send(peerAddresses[i], (uint8_t *) &dataToSend, sizeof(dataToSend));
-  }
+void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
+    // Map brightness value
+    float brightnessScale = (float)mapBrightness(user_brightness) / 255.0f;
+    
+    // Prepare data to send
+    dataToSend.numBuzzerBeeps = numBuzzerBeeps;
+    dataToSend.buzzerDuration = buzzerDuration;
+    dataToSend.buzzerBreak = buzzerBreak;
+    dataToSend.buzzerPitch = buzzerPitch;
+
+    // Apply brightness scaling when copying LED colors
+    for(int i = 0; i < NUM_LEDS; i++) {
+        dataToSend.ledColors[i][0] = (uint8_t)(ledColors[i][0] * brightnessScale);
+        dataToSend.ledColors[i][1] = (uint8_t)(ledColors[i][1] * brightnessScale);
+        dataToSend.ledColors[i][2] = (uint8_t)(ledColors[i][2] * brightnessScale);
+    }
+
+    // Send data to all peers
+    for (int i = 0; i < sizeof(peerAddresses) / sizeof(peerAddresses[0]); i++) {
+        esp_err_t result = esp_now_send(peerAddresses[i], (uint8_t *) &dataToSend, sizeof(dataToSend));
+    }
 }
 
 void updateLedStrip(uint8_t group, float progress, bool isShooting) {
@@ -208,6 +245,10 @@ void enterCollectArrowsPhase() {
     delay(10);
   }
   ffwPressed = false;
+
+  // calculate system brightness
+  int system_brightness = mapBrightness(user_brightness);
+
 }
 
 void loop() {
