@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
 #include <Wire.h>
@@ -13,7 +14,7 @@ int user_brightness = 3; // Clocks LED brightness (1-10) # TODO: Implement brigh
 
 
 // Pin Definitions
-#define FFW_Button      14
+#define FWD_Button      14
 #define HLD_UP_Button   13
 #define STP_DWN_Button  12
 #define BUZZER          25
@@ -46,27 +47,67 @@ typedef struct {
 DataPackage dataToSend;
 
 // Button states
-volatile bool ffwPressed = false;
+volatile bool fwdPressed = false;
 volatile bool holdPressed = false;
 volatile bool stopPressed = false;
 
 // Debounce variables
-volatile unsigned long lastFFWPress = 0;
+volatile unsigned long lastFWDPress = 0;
 volatile unsigned long lastHoldPress = 0;
 volatile unsigned long lastStopPress = 0;
 const unsigned long debounceDelay = 50; // Debounce delay in milliseconds
 
+void checkButtons() {
+    unsigned long currentTime = millis();
+
+    // Check FWD button
+    bool fwdReading = digitalRead(FWD_Button);
+    if (fwdReading != fwdPressed && (currentTime - lastFWDPress) > debounceDelay) {
+        lastFWDPress = currentTime;
+        if (fwdReading == HIGH) {
+            Serial.println("FWD button pressed");
+            fwdPressed = true;
+        } else {
+            fwdPressed = false;
+        }
+    }
+
+    // Check HOLD button
+    bool holdReading = digitalRead(HLD_UP_Button);
+    if (holdReading != holdPressed && (currentTime - lastHoldPress) > debounceDelay) {
+        lastHoldPress = currentTime;
+        if (holdReading == HIGH) {
+            Serial.println("HLD_UP button pressed");
+            holdPressed = true;
+        } else {
+            holdPressed = false;
+        }
+    }
+
+    // Check STOP button
+    bool stopReading = digitalRead(STP_DWN_Button);
+    if (stopReading != stopPressed && (currentTime - lastStopPress) > debounceDelay) {
+        lastStopPress = currentTime;
+        if (stopReading == HIGH) {
+            Serial.println("STP_DWN button pressed");
+            stopPressed = true;
+        } else {
+            stopPressed = false;
+        }
+    }
+}
+
 // Callback when data is sent
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("\r\nLast Packet Send Status:\t");
+  Serial.print("\rLast Packet Send Status:\t");
   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
-void IRAM_ATTR handleFFWPress() {
+void IRAM_ATTR handleFWDPress() {
   unsigned long currentTime = millis();
-  if (currentTime - lastFFWPress > debounceDelay) {
-    ffwPressed = true;
-    lastFFWPress = currentTime;
+  if (currentTime - lastFWDPress > debounceDelay) {
+    fwdPressed = true;
+    lastFWDPress = currentTime;
   }
 }
 
@@ -86,7 +127,7 @@ void IRAM_ATTR handleStopPress() {
   }
 }
 
-void setup() {
+void setup() { //MARK: set-up
   Serial.begin(115200);  // Initialize Serial Monitor
 
   Wire.begin(SDA, SCL);  // Initialize the I2C communication with specified SDA and SCL pins
@@ -119,40 +160,24 @@ void setup() {
   }
 
   // Set button pins as input
-  pinMode(FFW_Button, INPUT_PULLUP);
-  pinMode(HLD_UP_Button, INPUT_PULLUP);
-  pinMode(STP_DWN_Button, INPUT_PULLUP);
-
-  // Attach interrupts to buttons
-  attachInterrupt(digitalPinToInterrupt(FFW_Button), handleFFWPress, RISING);
-  attachInterrupt(digitalPinToInterrupt(HLD_UP_Button), handleHoldPress, RISING);
-  attachInterrupt(digitalPinToInterrupt(STP_DWN_Button), handleStopPress, RISING);
+  pinMode(FWD_Button,     INPUT_PULLDOWN);
+  pinMode(HLD_UP_Button,  INPUT_PULLDOWN);
+  pinMode(STP_DWN_Button, INPUT_PULLDOWN);
 }
 
 int mapBrightness(int user_brightness) {
     switch (user_brightness) {
-        case 1:
-            return 1;    // ~0.4%
-        case 2:
-            return 5;    // ~2%
-        case 3:
-            return 10;   // ~4%
-        case 4:
-            return 20;   // ~8%
-        case 5:
-            return 40;   // ~16%
-        case 6:
-            return 70;   // ~27%
-        case 7:
-            return 110;  // ~43%
-        case 8:
-            return 150;  // ~59%
-        case 9:
-            return 200;  // ~78%
-        case 10:
-            return 255;  // 100%
-        default:
-            return 255;  // Default full brightness
+        case 1:   return 1;    // ~0.4%
+        case 2:   return 5;    // ~2%
+        case 3:   return 10;   // ~4%
+        case 4:   return 20;   // ~8%
+        case 5:   return 40;   // ~16%
+        case 6:   return 70;   // ~27%
+        case 7:   return 110;  // ~43%
+        case 8:   return 150;  // ~59%
+        case 9:   return 200;  // ~78%
+        case 10:  return 255;  // 100%
+        default:  return 255;  // Default full brightness
     }
 }
 
@@ -236,22 +261,22 @@ void enterCollectArrowsPhase() {
   u8g2.setCursor(8, 42);
   u8g2.print("Phase: Collect arrows");
   u8g2.setCursor(4, 57);
-  u8g2.print("Press FFW to continue");
+  u8g2.print("Press FWD to continue");
   u8g2.sendBuffer();
   u8g2.setDrawColor(1); // Set draw color back to foreground color
 
-  // Stay in the collect arrows phase until the FFW button is pressed
-  while (!ffwPressed) {
+  // Stay in the collect arrows phase until the FWD button is pressed
+  while (!fwdPressed) {
     delay(10);
   }
-  ffwPressed = false;
+  fwdPressed = false;
 
   // calculate system brightness
   int system_brightness = mapBrightness(user_brightness);
 
 }
 
-void loop() {
+void loop() { //MARK:loop
   static int currentRound = 0;
   static int currentGroup = 0;
   static unsigned long roundStartTime = 0;
@@ -262,24 +287,7 @@ void loop() {
 
   unsigned long currentTime = millis();
 
-  if (ffwPressed) {
-    ffwPressed = false;
-    isShooting = !isShooting;
-    roundStartTime = currentTime;
-  }
-
-  if (holdPressed) {
-    holdPressed = false;
-    while (!ffwPressed) {
-      delay(10); // Hold the loop
-    }
-    ffwPressed = false;
-  }
-
-  if (stopPressed) {
-    stopPressed = false;
-    // Implement stop functionality if needed
-  }
+  checkButtons();
 
   if (currentRound < prac_rounds + comp_rounds) {
     // Check if the current phase time has elapsed
