@@ -163,22 +163,40 @@ void setup() { //MARK: set-up
   pinMode(FWD_Button,     INPUT_PULLDOWN);
   pinMode(HLD_UP_Button,  INPUT_PULLDOWN);
   pinMode(STP_DWN_Button, INPUT_PULLDOWN);
+
+  // Wait for fwd button press
+  u8g2.setFont(u8g2_font_helvB08_tr);
+  u8g2.drawBox(0, 0, 128, 64); // Draw a filled rectangle to invert the screen
+  u8g2.setDrawColor(0); // Set draw color to background color
+  u8g2.setCursor(35, 25);
+  u8g2.print("Press FWD");
+  u8g2.setCursor(10, 40);
+  u8g2.print("to Start Competition");
+  u8g2.sendBuffer();
+  u8g2.setDrawColor(1); // Set draw color back to foreground color
+
+  while (!fwdPressed) {
+    checkButtons();
+  }
+  delay(200); // Waitto avoid multiple button presses
+  
+// End of setup
 }
 
 int mapBrightness(int user_brightness) {
-    switch (user_brightness) {
-        case 1:   return 1;    // ~0.4%
-        case 2:   return 5;    // ~2%
-        case 3:   return 10;   // ~4%
-        case 4:   return 20;   // ~8%
-        case 5:   return 40;   // ~16%
-        case 6:   return 70;   // ~27%
-        case 7:   return 110;  // ~43%
-        case 8:   return 150;  // ~59%
-        case 9:   return 200;  // ~78%
-        case 10:  return 255;  // 100%
-        default:  return 255;  // Default full brightness
-    }
+  switch (user_brightness) {
+    case 1:   return 1;    // ~0.4%
+    case 2:   return 5;    // ~2%
+    case 3:   return 10;   // ~4%
+    case 4:   return 20;   // ~8%
+    case 5:   return 40;   // ~16%
+    case 6:   return 70;   // ~27%
+    case 7:   return 110;  // ~43%
+    case 8:   return 150;  // ~59%
+    case 9:   return 200;  // ~78%
+    case 10:  return 255;  // 100%
+    default:  return 255;  // Default full brightness
+  }
 }
 
 void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
@@ -315,7 +333,7 @@ void loop() { //MARK:loop
 
       // Update the display
       u8g2.clearBuffer();
-      u8g2.setFont(u8g2_font_helvB08_tr); // Use a sans-serif font
+      u8g2.setFont(u8g2_font_helvB08_tr); // sans-serif font
 
       // Display current round
       u8g2.setCursor(0, 8);
