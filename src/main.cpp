@@ -56,11 +56,14 @@ volatile bool stopPressed = false;
 volatile unsigned long lastFWDPress   = 0;
 volatile unsigned long lastHoldPress  = 0;
 volatile unsigned long lastStopPress  = 0;
-const unsigned long debounceDelay     = 50; // Debounce delay in milliseconds
+const unsigned long debounceDelay     = 500; // Debounce delay in milliseconds
 
 // Battery measurement variables
 #define ALPHA 0.0001 // Smoothing factor for EMA (0 < ALPHA <= 1)
 float emaBatteryPercentage = 0.0; // Initialize EMA value //TODO: initialize with the actual value, even if it is unstable, to avoid the initial delay
+
+// Setup complete flag
+bool setupComplete = false;
 
 void checkButtons() {
     unsigned long currentTime = millis();
@@ -201,70 +204,10 @@ void displaySkipMessage() {
   checkButtons(); // Wait for button release, to avoid multiple skips
   while (fwdPressed){checkButtons();}
   
-  delay(2000); // Display the message for 1 second
+  delay(1000); // Display the message for 1 second
   u8g2.setDrawColor(1); // Set draw color back to foreground color
 }
 
-
-void setup() { //MARK: set-up
-  Serial.begin(115200);  // Initialize Serial Monitor
-
-  Wire.begin(SDA, SCL);  // Initialize the I2C communication with specified SDA and SCL pins
-  u8g2.begin();  // Initialize the OLED display
-
-  WiFi.mode(WIFI_STA);  // Set device as a Wi-Fi Station
-
-  // Init ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    return;
-  }
-
-  // Register send callback
-  esp_now_register_send_cb(OnDataSent);
-
-  // Add peers
-  for (int i = 0; i < sizeof(peerAddresses) / sizeof(peerAddresses[0]); i++) {
-    esp_now_peer_info_t peerInfo;
-    memset(&peerInfo, 0, sizeof(peerInfo));
-    memcpy(peerInfo.peer_addr, peerAddresses[i], 6);
-    peerInfo.channel = 0;  
-    peerInfo.encrypt = false;
-
-    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-      Serial.print("Failed to add peer: ");
-      Serial.println(i);
-      return;
-    }
-  }
-
-  // Set pinModes
-  pinMode(FWD_Button,     INPUT_PULLDOWN);
-  pinMode(HLD_UP_Button,  INPUT_PULLDOWN);
-  pinMode(STP_DWN_Button, INPUT_PULLDOWN);
-  pinMode(BATTERY_PIN,    INPUT);
-  pinMode(BUZZER,         OUTPUT);
-
-  emaBatteryPercentage = readBatteryLevel(); // Initialize EMA value with the actual value, to avoid the initial delay
-
-  // Wait for fwd button press
-  u8g2.setFont(u8g2_font_helvB08_tr);
-  u8g2.drawBox(0, 0, 128, 64); // Draw a filled rectangle to invert the screen
-  u8g2.setDrawColor(0); // Set draw color to background color
-  u8g2.setCursor(35, 25);
-  u8g2.print("Press FWD");
-  u8g2.setCursor(10, 40);
-  u8g2.print("to Start Competition");
-  u8g2.sendBuffer();
-  u8g2.setDrawColor(1); // Set draw color back to foreground color
-
-  while (!fwdPressed) {
-    checkButtons();
-  }
-  delay(200); // Wait to avoid multiple button presses
-  
-// End of setup
-}
 
 int mapBrightness(int user_brightness) {
   switch (user_brightness) {
@@ -367,11 +310,63 @@ void enterCollectArrowsPhase() {
   while (!fwdPressed) {
     checkButtons();
   }
-  fwdPressed = false;
+  fwdPressed = false; // Reset button state
+}
 
-  // calculate system brightness
-  int system_brightness = mapBrightness(user_brightness);
 
+void setup() { //MARK: set-up
+  Serial.begin(115200);  // Initialize Serial Monitor
+
+  Wire.begin(SDA, SCL);  // Initialize the I2C communication with specified SDA and SCL pins
+  u8g2.begin();  // Initialize the OLED display
+
+  WiFi.mode(WIFI_STA);  // Set device as a Wi-Fi Station
+
+  // Init ESP-NOW
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  // Register send callback
+  esp_now_register_send_cb(OnDataSent);
+
+  // Add peers
+  for (int i = 0; i < sizeof(peerAddresses) / sizeof(peerAddresses[0]); i++) {
+    esp_now_peer_info_t peerInfo;
+    memset(&peerInfo, 0, sizeof(peerInfo));
+    memcpy(peerInfo.peer_addr, peerAddresses[i], 6);
+    peerInfo.channel = 0;  
+    peerInfo.encrypt = false;
+
+    if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+      Serial.print("Failed to add peer: ");
+      Serial.println(i);
+      return;
+    }
+  }
+
+  // Set pinModes
+  pinMode(FWD_Button,     INPUT_PULLDOWN);
+  pinMode(HLD_UP_Button,  INPUT_PULLDOWN);
+  pinMode(STP_DWN_Button, INPUT_PULLDOWN);
+  pinMode(BATTERY_PIN,    INPUT);
+  pinMode(BUZZER,         OUTPUT);
+
+  emaBatteryPercentage = readBatteryLevel(); // Initialize EMA value with the actual value, to avoid the initial delay
+
+  // Wait for fwd button press
+  u8g2.setFont(u8g2_font_helvB08_tr);
+  u8g2.drawBox(0, 0, 128, 64); // Draw a filled rectangle to invert the screen
+  u8g2.setDrawColor(0); // Set draw color to background color
+  u8g2.setCursor(35, 25);
+  u8g2.print("Press FWD");
+  u8g2.setCursor(10, 40);
+  u8g2.print("to Start Competition");
+  u8g2.sendBuffer();
+  u8g2.setDrawColor(1); // Set draw color back to foreground color
+
+  setupComplete = true;  // Indicate that setup is complete
 }
 
 
@@ -387,15 +382,27 @@ void loop() { //MARK:loop
 
   checkButtons();
 
+  // Wait for the initial FWD button press to start the timers
+  static bool initialFwdPressed = false;
+  if (!initialFwdPressed) {
+    if (setupComplete && fwdPressed) {
+      initialFwdPressed = true;
+      fwdPressed = false;
+      roundStartTime = currentTime; // Initialize the round start time
+    } else {
+      return; // Exit the loop function until the FWD button is pressed
+    }
+  }
+
   // Handle FWD button press to skip current phase
-if (fwdPressed) {
+  if (fwdPressed) {
     if (isShooting) {  // Only allow skip during shooting phase
-        unsigned long phaseTime = time_round * 1000;
-        roundStartTime = currentTime - phaseTime; // Force phase completion
-        displaySkipMessage();
+      unsigned long phaseTime = time_round * 1000;
+      roundStartTime = currentTime - phaseTime; // Force phase completion
+      displaySkipMessage();
     }
     fwdPressed = false; // Reset button state
-}
+  }
 
   if (currentRound < prac_rounds + comp_rounds) {
     // Check if the current phase time has elapsed
@@ -412,7 +419,7 @@ if (fwdPressed) {
         }
       }
       isShooting = !isShooting;
-      roundStartTime = currentTime;
+      roundStartTime = currentTime; // Reset the round start time
     }
 
     // Update the display and LED strip at regular intervals
