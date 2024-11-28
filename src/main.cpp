@@ -186,7 +186,23 @@ void displayBatteryLevel() {
     u8g2.setCursor(90, 8);
   }
   u8g2.printf("%d%%", batteryLevel);
+}
 
+
+void displaySkipMessage() {
+  u8g2.drawBox(0, 27, 128, 36); // Clear the display area
+  u8g2.setDrawColor(0); // Set draw color to background color
+  u8g2.setCursor(8, 42);
+  u8g2.print("FWD button pressed");
+  u8g2.setCursor(4, 57);
+  u8g2.print("Skipping to end of phase");
+  u8g2.sendBuffer();
+  
+  checkButtons(); // Wait for button release, to avoid multiple skips
+  while (fwdPressed){checkButtons();}
+  
+  delay(2000); // Display the message for 1 second
+  u8g2.setDrawColor(1); // Set draw color back to foreground color
 }
 
 
@@ -371,6 +387,16 @@ void loop() { //MARK:loop
 
   checkButtons();
 
+  // Handle FWD button press to skip current phase
+if (fwdPressed) {
+    if (isShooting) {  // Only allow skip during shooting phase
+        unsigned long phaseTime = time_round * 1000;
+        roundStartTime = currentTime - phaseTime; // Force phase completion
+        displaySkipMessage();
+    }
+    fwdPressed = false; // Reset button state
+}
+
   if (currentRound < prac_rounds + comp_rounds) {
     // Check if the current phase time has elapsed
     if (currentTime - roundStartTime >= (isShooting ? time_round : time_line) * 1000) {
@@ -439,8 +465,26 @@ void loop() { //MARK:loop
   }
 }
 
-//BXUG: both phases (to the line and shooting) are displayed as "Shooting"
-//TODO: Implement skiping of the phasses with fwd button
-//TODO: Batery charge indicator
+//XBUG: both phases (to the line and shooting) are displayed as "Shooting"
+//XTODO: Implement skiping of the shooting phasses with fwd button
+//XTODO: Batery charge indicator
 //TODO: Change order of the groups
 //TODO: Check batery and buttons during waiting -> wating function?
+//BUG: The timers start running before the first FWD press
+
+
+/*
+TestArcheryControlSystem
+
+├── Basic Phase Control
+│   ├── Test normal phase progression
+│   └── Test phase timing accuracy
+├── FWD Button Functionality  
+│   ├── Test FWD press during shooting phase
+│   └── Test FWD press during line-up phase (should not skip)
+├── Group Progression
+│   ├── Test group advancement
+│   └── Test round completion
+└── Practice/Competition Transition
+  └── Test transition from practice to competition rounds// Modified loop() function
+*/
