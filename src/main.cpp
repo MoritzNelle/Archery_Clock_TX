@@ -20,6 +20,7 @@ int user_brightness = 3; // Clocks LED brightness (1-10) # TODO: Implement brigh
 #define BUZZER          25
 #define SDA             18
 #define SCL             19
+#define BATTERY_PIN     35
 
 // Definitions
 #define NUM_LEDS        75
@@ -52,10 +53,14 @@ volatile bool holdPressed = false;
 volatile bool stopPressed = false;
 
 // Debounce variables
-volatile unsigned long lastFWDPress = 0;
-volatile unsigned long lastHoldPress = 0;
-volatile unsigned long lastStopPress = 0;
-const unsigned long debounceDelay = 50; // Debounce delay in milliseconds
+volatile unsigned long lastFWDPress   = 0;
+volatile unsigned long lastHoldPress  = 0;
+volatile unsigned long lastStopPress  = 0;
+const unsigned long debounceDelay     = 50; // Debounce delay in milliseconds
+
+// Battery measurement variables
+#define ALPHA 0.0001 // Smoothing factor for EMA (0 < ALPHA <= 1)
+float emaBatteryPercentage = 0.0; // Initialize EMA value //TODO: initialize with the actual value, even if it is unstable, to avoid the initial delay
 
 void checkButtons() {
     unsigned long currentTime = millis();
@@ -127,6 +132,64 @@ void IRAM_ATTR handleStopPress() {
   }
 }
 
+
+float readBatteryLevel() {
+    // Read the analog value
+    int analogValue = analogRead(BATTERY_PIN);
+    // Convert the analog value to voltage (3.3V reference and 12-bit ADC)
+    float voltage = analogValue * (3.3 / 4095.0);
+    // Since the voltage is halved by the voltage divider
+    float batteryVoltage = voltage * 2;
+
+    // Convert battery voltage to percentage
+    float minVoltage = 3.0;
+    float maxVoltage = 4.2;
+    float batteryPercentage = ((batteryVoltage - minVoltage) / (maxVoltage - minVoltage)) * 100.0;
+
+    // Ensure the percentage is within 0-100%
+    if (batteryPercentage > 100.0) {
+        batteryPercentage = 100.0;
+    } else if (batteryPercentage < 0.0) {
+        batteryPercentage = 0.0;
+    }
+
+    return batteryPercentage;
+}
+
+float calculateEmaBatteryPercentage() {
+    float batteryPercentage;
+    batteryPercentage = readBatteryLevel();
+    emaBatteryPercentage = (ALPHA * batteryPercentage) + ((1 - ALPHA) * emaBatteryPercentage);
+
+    return emaBatteryPercentage;
+}
+
+void displayBatteryLevel() {
+  // Draw battery level indicator
+  int batteryLevel = (int)calculateEmaBatteryPercentage();
+  int batteryWidth = map(batteryLevel, 0, 100, 0, 16); // Map battery level to width (0-16 pixels)
+  
+  // Draw battery outline
+  u8g2.drawFrame(112, 0, 16, 8); // x, y, width, height
+  u8g2.drawBox(110, 2, 2, 4); // Battery terminal
+
+  // Draw battery level
+  if (batteryLevel < 100) {
+    u8g2.drawBox(112, 0, batteryWidth, 8); // x, y, width, height
+  } else {
+    u8g2.drawBox(112, 0, 16, 8); // Full battery
+  }
+batteryLevel = 100;
+  if (batteryLevel == 100) {
+    u8g2.setCursor(85, 8); // Adjusted cursor position to avoid writing over the battery
+  } else {
+    u8g2.setCursor(90, 8);
+  }
+  u8g2.printf("%d%%", batteryLevel);
+
+}
+
+
 void setup() { //MARK: set-up
   Serial.begin(115200);  // Initialize Serial Monitor
 
@@ -159,10 +222,14 @@ void setup() { //MARK: set-up
     }
   }
 
-  // Set button pins as input
+  // Set pinModes
   pinMode(FWD_Button,     INPUT_PULLDOWN);
   pinMode(HLD_UP_Button,  INPUT_PULLDOWN);
   pinMode(STP_DWN_Button, INPUT_PULLDOWN);
+  pinMode(BATTERY_PIN,    INPUT);
+  pinMode(BUZZER,         OUTPUT);
+
+  emaBatteryPercentage = readBatteryLevel(); // Initialize EMA value with the actual value, to avoid the initial delay
 
   // Wait for fwd button press
   u8g2.setFont(u8g2_font_helvB08_tr);
@@ -178,7 +245,7 @@ void setup() { //MARK: set-up
   while (!fwdPressed) {
     checkButtons();
   }
-  delay(200); // Waitto avoid multiple button presses
+  delay(200); // Wait to avoid multiple button presses
   
 // End of setup
 }
@@ -270,10 +337,7 @@ void enterCollectArrowsPhase() {
   }
   sendData(3, 100, 50, 5, ledColors);
 
-  // Update the display to show collection phase
-  // u8g2.clearBuffer();
-  // u8g2.setFont(u8g2_font_ncenB08_tr);
-  u8g2.drawBox(0, 27, 128, 36);
+  u8g2.drawBox(0, 27, 128, 36); 
 
   u8g2.setDrawColor(0); // Set draw color to background color
   u8g2.setCursor(8, 42);
@@ -285,7 +349,7 @@ void enterCollectArrowsPhase() {
 
   // Stay in the collect arrows phase until the FWD button is pressed
   while (!fwdPressed) {
-    delay(10);
+    checkButtons();
   }
   fwdPressed = false;
 
@@ -295,15 +359,14 @@ void enterCollectArrowsPhase() {
 }
 
 void loop() { //MARK:loop
-  static int currentRound = 0;
-  static int currentGroup = 0;
+  static int currentRound             = 0;
+  static int currentGroup             = 0;
   static unsigned long roundStartTime = 0;
-  static bool isShooting = false;
-  static bool isPractice = true;
+  static bool isShooting              = false;
+  static bool isPractice              = true;
   static unsigned long lastUpdateTime = 0;
-  const unsigned long updateInterval = 1000; // Update interval in milliseconds
-
-  unsigned long currentTime = millis();
+  const unsigned long updateInterval  = 1000; // Update interval in milliseconds
+  unsigned long currentTime           = millis();
 
   checkButtons();
 
@@ -342,11 +405,11 @@ void loop() { //MARK:loop
       } else {
         u8g2.printf("R%d/%d", currentRound - prac_rounds + 1, comp_rounds);
       }
-      u8g2.printf("  (Group: %d/%d)", currentGroup + 1, num_groups); // Display current and next group with colors
+      u8g2.printf(" (Group: %d/%d)", currentGroup + 1, num_groups); // Display current and next group with colors
 
       // Display current shooting phase
       u8g2.setCursor(0, 22);
-      u8g2.printf("Shooting: %s->%s", groupColors[currentGroup], groupColors[(currentGroup + 1) % num_groups]); // Display current and next group with colors
+      u8g2.printf("Group: %s -> %s", groupColors[currentGroup], groupColors[(currentGroup + 1) % num_groups]); // Display current and next group with colors
 
       // Display current phase
       u8g2.setCursor(0, 36);
@@ -365,6 +428,8 @@ void loop() { //MARK:loop
       u8g2.drawFrame(0, 52, 128, 12);
       u8g2.drawBox(0, 52, progressBarWidth, 12);
 
+      displayBatteryLevel();      // Display/update battery level indicator
+
       u8g2.sendBuffer();
     }
   } else {
@@ -372,3 +437,9 @@ void loop() { //MARK:loop
     enterCollectArrowsPhase();
   }
 }
+
+//BXUG: both phases (to the line and shooting) are displayed as "Shooting"
+//TODO: Implement skiping of the phasses with fwd button
+//TODO: Batery charge indicator
+//TODO: Change order of the groups
+//TODO: Check batery and buttons during waiting -> wating function?
