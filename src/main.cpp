@@ -179,7 +179,7 @@ void displayBatteryLevel() {
   } else {
     u8g2.drawBox(112, 0, 16, 8); // Full battery
   }
-batteryLevel = 100;
+
   if (batteryLevel == 100) {
     u8g2.setCursor(85, 8); // Adjusted cursor position to avoid writing over the battery
   } else {
@@ -357,6 +357,7 @@ void enterCollectArrowsPhase() {
   int system_brightness = mapBrightness(user_brightness);
 
 }
+
 
 void loop() { //MARK:loop
   static int currentRound             = 0;
