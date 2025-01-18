@@ -64,6 +64,7 @@ float emaBatteryPercentage = 0.0; // Initialize EMA value //TODO: initialize wit
 
 // Setup complete flag
 bool setupComplete = false;
+uint8_t rainbowOffset = 0;  // Tracks rainbow animation position
 
 void checkButtons() {
     unsigned long currentTime = millis();
@@ -225,6 +226,33 @@ int mapBrightness(int user_brightness) {
   }
 }
 
+
+// HSV to RGB conversion helper function
+void HSVtoRGB(uint8_t hue, uint8_t sat, uint8_t val, uint8_t* rgb) {
+    uint8_t r, g, b;
+    
+    uint8_t region = hue / 43;
+    uint8_t remainder = (hue - (region * 43)) * 6; 
+
+    uint8_t p = (val * (255 - sat)) >> 8;
+    uint8_t q = (val * (255 - ((sat * remainder) >> 8))) >> 8;
+    uint8_t t = (val * (255 - ((sat * (255 - remainder)) >> 8))) >> 8;
+
+    switch(region) {
+        case 0:  r = val; g = t;   b = p;   break;
+        case 1:  r = q;   g = val; b = p;   break;
+        case 2:  r = p;   g = val; b = t;   break;
+        case 3:  r = p;   g = q;   b = val; break;
+        case 4:  r = t;   g = p;   b = val; break;
+        default: r = val; g = p;   b = q;   break;
+    }
+    
+    rgb[0] = r;
+    rgb[1] = g;
+    rgb[2] = b;
+}
+
+
 void sendData(uint8_t numBuzzerBeeps, uint8_t buzzerDuration, uint8_t buzzerBreak, uint8_t buzzerPitch, uint8_t ledColors[NUM_LEDS][3]) {
     // Map brightness value
     float brightnessScale = (float)mapBrightness(user_brightness) / 255.0f;
@@ -284,6 +312,31 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
 
   sendData(0, 100, 50, 5, ledColors); // Adjust the buzzer parameters as needed
 }
+
+
+void displayRainbowAnimation(uint8_t speed) {
+    uint8_t ledColors[NUM_LEDS][3] = {0};
+    
+    // Generate rainbow pattern
+    for(int i = 0; i < NUM_LEDS; i++) {
+        uint8_t hue = ((i * 255 / NUM_LEDS) + rainbowOffset) % 255;
+        uint8_t rgb[3];
+        HSVtoRGB(hue, 255, 255, rgb);
+        
+        ledColors[i][0] = rgb[0];
+        ledColors[i][1] = rgb[1];
+        ledColors[i][2] = rgb[2];
+    }
+    
+    // Update rainbow offset for next frame
+    rainbowOffset = (rainbowOffset + speed) % 255;
+    
+    // Send to LED strips
+    sendData(0, 0, 0, 0, ledColors);
+    
+    //delay(20); // Small delay to control animation speed
+}
+
 
 // Define the colors for each group
 const char* groupColors[] = {"Red", "Green", "Blue", "Yellow"};
@@ -406,7 +459,7 @@ void setup() { //MARK: set-up
 
   emaBatteryPercentage = readBatteryLevel(); // Initialize EMA value with the actual value, to avoid the initial delay
 
- // Run setup phase
+  // Run setup phase
   setupPhase();
 
   // Wait for fwd button press
@@ -523,9 +576,11 @@ void loop() { //MARK:loop
 
       u8g2.sendBuffer();
     }
-  } else {
-    // Enter "collect your arrows" phase after all rounds are completed
-    enterCollectArrowsPhase();
+} else {
+    // Competition is over - show endless rainbow
+    while(true) {
+      displayRainbowAnimation(1);
+    }
   }
 }
 
@@ -541,12 +596,12 @@ void loop() { //MARK:loop
 //TODO: Change colors: get to the line - blue, shooting - green, collect arrows - red
 //TODO: changee shooting-phase color from blue to orange when there are 10 seconds left
 //TODO: Change the way leds are turned off, from num of leds per one sec to period between the leds, avoid a diffrent about of leds in the same time beeing turned off
-//TODO: Implement the set up phase
+//xTODO: Implement the set up phase
 //TODO: Make the set up phase more user friendly
   //TODO: Enable the user to skip the entire set up phase
-  //TODO: After the last variable is set, display "Press FWD to start the competition"
-//TODO: Store the set up values in the EEPROM
-//BUG: the battery indicator is filled from the wrong side
+  //XTODO: After the last variable is set, display "Press FWD to start the competition"
+  //TODO: Store the set up values in the EEPROM
+//XBUG: the battery indicator is filled from the wrong side
 
 /*
 TestArcheryControlSystem
