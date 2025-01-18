@@ -406,6 +406,9 @@ void setup() { //MARK: set-up
 
   emaBatteryPercentage = readBatteryLevel(); // Initialize EMA value with the actual value, to avoid the initial delay
 
+ // Run setup phase
+  setupPhase();
+
   // Wait for fwd button press
   u8g2.setFont(u8g2_font_helvB08_tr);
   u8g2.drawBox(0, 0, 128, 64); // Draw a filled rectangle to invert the screen
@@ -416,9 +419,6 @@ void setup() { //MARK: set-up
   u8g2.print("to Start Competition");
   u8g2.sendBuffer();
   u8g2.setDrawColor(1); // Set draw color back to foreground color
-
-  // Run setup phase
-  setupPhase();
 
   setupComplete = true;  // Indicate that setup is complete
 }
@@ -470,6 +470,9 @@ void loop() { //MARK:loop
 
           // Enter "collect your arrows" phase
           enterCollectArrowsPhase();
+          roundStartTime = millis(); // Reset timer after arrow collection phase
+          isShooting = false; // Ensure we start with "get to the line" phase
+          return; // Exit loop to prevent timer from running during collection
         }
       }
       isShooting = !isShooting;
@@ -536,10 +539,14 @@ void loop() { //MARK:loop
 //TODO: Implement the buzzer sound also for: after get to the line, after the shooting phase
 //TODO: Implement rainbow for after there competition
 //TODO: Change colors: get to the line - blue, shooting - green, collect arrows - red
+//TODO: changee shooting-phase color from blue to orange when there are 10 seconds left
 //TODO: Change the way leds are turned off, from num of leds per one sec to period between the leds, avoid a diffrent about of leds in the same time beeing turned off
 //TODO: Implement the set up phase
 //TODO: Make the set up phase more user friendly
+  //TODO: Enable the user to skip the entire set up phase
+  //TODO: After the last variable is set, display "Press FWD to start the competition"
 //TODO: Store the set up values in the EEPROM
+//BUG: the battery indicator is filled from the wrong side
 
 /*
 TestArcheryControlSystem
