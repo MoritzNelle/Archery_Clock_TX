@@ -6,11 +6,11 @@
 
 // Competition variables
 int prac_rounds     = 2;  // Number of Practice rounds (0 - 5 #)
-int comp_rounds     = 5; // Number of Competition Rounds (0 - 20 #)
-int time_round      = 10; // Time per Round (10 - 210 s)
-int time_line       = 5; // Get to the line (0 - 30 s)
+int comp_rounds     = 10; // Number of Competition Rounds (0 - 20 #)
+int time_round      = 120; // Time per Round (10 - 210 s)
+int time_line       = 10; // Get to the line (0 - 30 s)
 int num_groups      = 4;  // Number of Archer Groups (1-4)
-int user_brightness = 3; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
+int user_brightness = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
 
 
 // Pin Definitions
@@ -313,6 +313,57 @@ void enterCollectArrowsPhase() {
   fwdPressed = false; // Reset button state
 }
 
+// Function to display the current variable and its value
+void displaySetupVariable(const char* name, int value) {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_helvB08_tr);
+    u8g2.setCursor(0, 20);
+    u8g2.printf("%s: %d", name, value);
+    u8g2.sendBuffer();
+}
+
+// Function to handle button presses during setup
+void handleSetupButtons(int& value, int minValue, int maxValue) {
+    checkButtons();
+    if (holdPressed) {
+        value = min(value + 1, maxValue);
+        holdPressed = false;
+    }
+    if (stopPressed) {
+        value = max(value - 1, minValue);
+        stopPressed = false;
+    }
+}
+
+// Setup phase function
+void setupPhase() {
+    const char* variableNames[] = {
+        "Practice Rounds",
+        "Competition Rounds",
+        "Time per Round (s)",
+        "Get to the Line (s)",
+        "Number of Groups",
+        "LED Brightness"
+    };
+    int* variables[] = {
+        &prac_rounds,
+        &comp_rounds,
+        &time_round,
+        &time_line,
+        &num_groups,
+        &user_brightness
+    };
+    int minValues[] = {0, 0, 10, 0, 1, 1};
+    int maxValues[] = {5, 20, 300, 30, 4, 10};
+
+    for (int i = 0; i < 6; i++) {
+        while (!fwdPressed) {
+            displaySetupVariable(variableNames[i], *variables[i]);
+            handleSetupButtons(*variables[i], minValues[i], maxValues[i]);
+        }
+        fwdPressed = false; // Reset button state
+    }
+}
 
 void setup() { //MARK: set-up
   Serial.begin(115200);  // Initialize Serial Monitor
@@ -365,6 +416,9 @@ void setup() { //MARK: set-up
   u8g2.print("to Start Competition");
   u8g2.sendBuffer();
   u8g2.setDrawColor(1); // Set draw color back to foreground color
+
+  // Run setup phase
+  setupPhase();
 
   setupComplete = true;  // Indicate that setup is complete
 }
@@ -475,10 +529,17 @@ void loop() { //MARK:loop
 //XBUG: both phases (to the line and shooting) are displayed as "Shooting"
 //XTODO: Implement skiping of the shooting phasses with fwd button
 //XTODO: Batery charge indicator
+//XBUG: The timers start running before the first FWD press
+//BUG: The timer is continuing during the "collect arrows" phase
 //TODO: Change order of the groups
 //TODO: Check batery and buttons during waiting -> wating function?
-//BUG: The timers start running before the first FWD press
-
+//TODO: Implement the buzzer sound also for: after get to the line, after the shooting phase
+//TODO: Implement rainbow for after there competition
+//TODO: Change colors: get to the line - blue, shooting - green, collect arrows - red
+//TODO: Change the way leds are turned off, from num of leds per one sec to period between the leds, avoid a diffrent about of leds in the same time beeing turned off
+//TODO: Implement the set up phase
+//TODO: Make the set up phase more user friendly
+//TODO: Store the set up values in the EEPROM
 
 /*
 TestArcheryControlSystem
