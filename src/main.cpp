@@ -11,7 +11,9 @@ int time_round      = 120; // Time per Round (10 - 210 s)
 int time_line       = 10; // Get to the line (0 - 30 s)
 int num_groups      = 4;  // Number of Archer Groups (1-4)
 int user_brightness = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
-
+int warning_threashold = 10; // seconds
+#define LED_COLOR_NORMAL 0, 0, 255    // Blue
+#define LED_COLOR_WARNING 255, 165, 0  // Orange
 
 // Pin Definitions
 #define FWD_Button      14
@@ -24,9 +26,7 @@ int user_brightness = 10; // Clocks LED brightness (1-10) # TODO: Implement brig
 
 // Definitions
 #define NUM_LEDS         75
-#define WARNING_THRESHOLD 10 // seconds
-#define LED_COLOR_NORMAL 0, 0, 255    // Blue
-#define LED_COLOR_WARNING 255, 165, 0  // Orange
+
 
 // Create an instance of the U8G2 display with SH1106 driver
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);
@@ -312,7 +312,7 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
   int activeLeds = (1.0 - progress) * (NUM_LEDS - num_groups - 3);
   for (int i = 0; i < activeLeds; i++) {
     if (isShooting) {
-      if (remainingTime <= WARNING_THRESHOLD) {
+      if (remainingTime <= warning_threashold) {
         ledColors[i][0] = 255;  // Orange R
         ledColors[i][1] = 165;  // Orange G
         ledColors[i][2] = 0;    // Orange B
@@ -409,7 +409,8 @@ void setupPhase() {
         "Time per Round (s)",
         "Get to the Line (s)",
         "Number of Groups",
-        "LED Brightness"
+        "LED Brightness",
+        "Warning Time (s)"
     };
     int* variables[] = {
         &prac_rounds,
@@ -417,12 +418,13 @@ void setupPhase() {
         &time_round,
         &time_line,
         &num_groups,
-        &user_brightness
+        &user_brightness,
+        &warning_threashold
     };
-    int minValues[] = {0, 0, 10, 0, 1, 1};
-    int maxValues[] = {5, 20, 300, 30, 4, 10};
+    int minValues[] = {0, 0, 10, 0, 1, 1, 5};
+    int maxValues[] = {5, 20, 300, 30, 4, 10, 30};
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < 7; i++) {
         while (!fwdPressed) {
             displaySetupVariable(variableNames[i], *variables[i]);
             handleSetupButtons(*variables[i], minValues[i], maxValues[i]);
