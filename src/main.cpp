@@ -23,7 +23,10 @@ int user_brightness = 10; // Clocks LED brightness (1-10) # TODO: Implement brig
 #define BATTERY_PIN     35
 
 // Definitions
-#define NUM_LEDS        75
+#define NUM_LEDS         75
+#define WARNING_THRESHOLD 10 // seconds
+#define LED_COLOR_NORMAL 0, 0, 255    // Blue
+#define LED_COLOR_WARNING 255, 165, 0  // Orange
 
 // Create an instance of the U8G2 display with SH1106 driver
 U8G2_SH1106_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ SCL, /* data=*/ SDA);
@@ -300,19 +303,29 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
     ledColors[NUM_LEDS - 2 - i][2] = groupColors[group][2];
   }
 
+  // Calculate remaining time in seconds
+  int remainingTime = isShooting ? 
+    time_round * (1.0 - progress) : 
+    time_line * (1.0 - progress);
+
   // Set the LEDs to indicate the progress
   int activeLeds = (1.0 - progress) * (NUM_LEDS - num_groups - 3);
   for (int i = 0; i < activeLeds; i++) {
     if (isShooting) {
-      ledColors[i][2] = 255; // Blue for shooting time
+      if (remainingTime <= WARNING_THRESHOLD) {
+        ledColors[i][0] = 255;  // Orange R
+        ledColors[i][1] = 165;  // Orange G
+        ledColors[i][2] = 0;    // Orange B
+      } else {
+        ledColors[i][2] = 255;  // Normal blue
+      }
     } else {
       ledColors[i][0] = 255; // Red for getting to the line
     }
   }
 
-  sendData(0, 100, 50, 5, ledColors); // Adjust the buzzer parameters as needed
+  sendData(0, 100, 50, 5, ledColors);
 }
-
 
 void displayRainbowAnimation(uint8_t speed) {
     uint8_t ledColors[NUM_LEDS][3] = {0};
@@ -594,7 +607,7 @@ void loop() { //MARK:loop
 //TODO: Implement the buzzer sound also for: after get to the line, after the shooting phase
 //TODO: Implement rainbow for after there competition
 //TODO: Change colors: get to the line - blue, shooting - green, collect arrows - red
-//TODO: changee shooting-phase color from blue to orange when there are 10 seconds left
+//TODO: change shooting-phase color from blue to orange when there are 10 seconds left
 //TODO: Change the way leds are turned off, from num of leds per one sec to period between the leds, avoid a diffrent about of leds in the same time beeing turned off
 //xTODO: Implement the set up phase
 //TODO: Make the set up phase more user friendly
