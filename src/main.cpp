@@ -5,15 +5,18 @@
 #include <U8g2lib.h>
 
 // Competition variables
-int prac_rounds     = 2;  // Number of Practice rounds (0 - 5 #)
-int comp_rounds     = 10; // Number of Competition Rounds (0 - 20 #)
-int time_round      = 120; // Time per Round (10 - 210 s)
-int time_line       = 10; // Get to the line (0 - 30 s)
-int num_groups      = 4;  // Number of Archer Groups (1-4)
-int user_brightness = 10; // Clocks LED brightness (1-10) # TODO: Implement brightness control in the code
-int warning_threashold = 10; // seconds
-#define LED_COLOR_NORMAL 0, 0, 255    // Blue
-#define LED_COLOR_WARNING 255, 165, 0  // Orange
+int prac_rounds         = 2;  // Number of Practice rounds (0 - 5 #)
+int comp_rounds         = 10; // Number of Competition Rounds (0 - 20 #)
+int time_round          = 120; // Time per Round (10 - 210 s)
+int time_line           = 10; // Get to the line (0 - 30 s)
+int num_groups          = 4;  // Number of Archer Groups (1-4)
+int user_brightness     = 10; // Clocks LED brightness (1-10) #xTODO: Implement brightness control in the code
+int warning_threashold  = 10; // seconds
+int color_shooting[3]   = {0, 255,   0};    // Green
+int color_to_line[3]    = {0,   0, 255};    // Blue
+int color_collect[3]    = {255, 0,   0};    // Red
+int color_warning[3]    = {255, 165, 0};    // Orange
+
 
 // Pin Definitions
 #define FWD_Button      14
@@ -63,7 +66,7 @@ const unsigned long debounceDelay     = 500; // Debounce delay in milliseconds
 
 // Battery measurement variables
 #define ALPHA 0.0001 // Smoothing factor for EMA (0 < ALPHA <= 1)
-float emaBatteryPercentage = 0.0; // Initialize EMA value //TODO: initialize with the actual value, even if it is unstable, to avoid the initial delay
+float emaBatteryPercentage = 0.0; // Initialize EMA value //xTODO: initialize with the actual value, even if it is unstable, to avoid the initial delay
 
 // Setup complete flag
 bool setupComplete = false;
@@ -313,14 +316,19 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
   for (int i = 0; i < activeLeds; i++) {
     if (isShooting) {
       if (remainingTime <= warning_threashold) {
-        ledColors[i][0] = 255;  // Orange R
-        ledColors[i][1] = 165;  // Orange G
-        ledColors[i][2] = 0;    // Orange B
+        ledColors[i][0] = color_warning[0];  // Orange R
+        ledColors[i][1] = color_warning[1];  // Orange G
+        ledColors[i][2] = color_warning[2];  // Orange B
+        sendData(1, 100, 50, 5, ledColors); // Buzzer sound for warning threshold
       } else {
-        ledColors[i][2] = 255;  // Normal blue
+        ledColors[i][0] = color_shooting[0];  // Green R
+        ledColors[i][1] = color_shooting[1];  // Green G
+        ledColors[i][2] = color_shooting[2];  // Green B
       }
     } else {
-      ledColors[i][0] = 255; // Red for getting to the line
+      ledColors[i][0] = color_to_line[0]; // Blue R
+      ledColors[i][1] = color_to_line[1]; // Blue G
+      ledColors[i][2] = color_to_line[2]; // Blue B
     }
   }
 
@@ -358,7 +366,9 @@ void enterCollectArrowsPhase() {
   // Indicate that archers can collect their arrows
   uint8_t ledColors[NUM_LEDS][3] = {0};
   for (int i = 0; i < NUM_LEDS; i++) {
-    ledColors[i][1] = 255; // Green to indicate collection time
+    ledColors[i][0] = color_collect[0]; // Red R
+    ledColors[i][1] = color_collect[1]; // Red G
+    ledColors[i][2] = color_collect[2]; // Red B
   }
   sendData(3, 100, 50, 5, ledColors);
 
@@ -603,24 +613,24 @@ void loop() { //MARK:loop
 //XTODO: Implement skiping of the shooting phasses with fwd button
 //XTODO: Batery charge indicator
 //XBUG: The timers start running before the first FWD press
-//BUG: The timer is continuing during the "collect arrows" phase
+//xBUG: The timer is continuing during the "collect arrows" phase
+//xTODO: Implement rainbow for after there competition
+//xTODO: change shooting-phase color from blue to orange when there are 10 seconds left
+//xTODO: Implement the set up phase
+
 //TODO: Change order of the groups
 //TODO: Check batery and buttons during waiting -> wating function?
-//TODO: Implement the buzzer sound also for: after get to the line, after the shooting phase
-//TODO: Implement rainbow for after there competition
-//TODO: Change colors: get to the line - blue, shooting - green, collect arrows - red
-//TODO: change shooting-phase color from blue to orange when there are 10 seconds left
+//TODO: Implement the buzzer sound also for: after get to the line, after the shooting phase, when the color changes to orange
+//TODO: set colors as variable for: get to the line - blue, shooting - green, collect arrows - red
 //TODO: Change the way leds are turned off, from num of leds per one sec to period between the leds, avoid a diffrent about of leds in the same time beeing turned off
-//xTODO: Implement the set up phase
 //TODO: Make the set up phase more user friendly
   //TODO: Enable the user to skip the entire set up phase
   //XTODO: After the last variable is set, display "Press FWD to start the competition"
   //TODO: Store the set up values in the EEPROM
-//XBUG: the battery indicator is filled from the wrong side
+//BUG: the battery indicator is filled from the wrong side
 
 /*
 TestArcheryControlSystem
-
 ├── Basic Phase Control
 │   ├── Test normal phase progression
 │   └── Test phase timing accuracy
@@ -630,6 +640,17 @@ TestArcheryControlSystem
 ├── Group Progression
 │   ├── Test group advancement
 │   └── Test round completion
-└── Practice/Competition Transition
-  └── Test transition from practice to competition rounds// Modified loop() function
+├── Practice/Competition Transition
+│   └── Test transition from practice to competition rounds
+├── LED Colors
+│   ├── Test color during shooting phase (green)
+│   ├── Test color during line-up phase (blue)
+│   ├── Test color during collect arrows phase (red)
+│   └── Test color change at warning threshold (orange)
+├── Buzzer Functionality
+│   ├── Test buzzer before get to the line
+│   ├── Test buzzer after get to the line
+│   └── Test buzzer at warning threshold
+└── Battery Indicator
+    └── Test battery level display
 */
