@@ -319,7 +319,6 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
         ledColors[i][0] = color_warning[0];  // Orange R
         ledColors[i][1] = color_warning[1];  // Orange G
         ledColors[i][2] = color_warning[2];  // Orange B
-        sendData(1, 100, 50, 5, ledColors); // Buzzer sound for warning threshold
       } else {
         ledColors[i][0] = color_shooting[0];  // Green R
         ledColors[i][1] = color_shooting[1];  // Green G
@@ -335,7 +334,7 @@ void updateLedStrip(uint8_t group, float progress, bool isShooting) {
   sendData(0, 100, 50, 5, ledColors);
 }
 
-void displayRainbowAnimation(uint8_t speed) {
+void displayRainbowAnimation() {
     uint8_t ledColors[NUM_LEDS][3] = {0};
     
     // Generate rainbow pattern
@@ -350,12 +349,10 @@ void displayRainbowAnimation(uint8_t speed) {
     }
     
     // Update rainbow offset for next frame
-    rainbowOffset = (rainbowOffset + speed) % 255;
+    rainbowOffset = (rainbowOffset + 1) % 255;
     
     // Send to LED strips
     sendData(0, 0, 0, 0, ledColors);
-    
-    //delay(20); // Small delay to control animation speed
 }
 
 
@@ -411,6 +408,40 @@ void handleSetupButtons(int& value, int minValue, int maxValue) {
     }
 }
 
+void testAllLeds() {
+  uint8_t ledColors[NUM_LEDS][3] = {0};
+
+  // Set all LEDs to white for the test
+  for (int i = 0; i < NUM_LEDS; i++) {
+    ledColors[i][0] = 255; // Red
+    ledColors[i][1] = 255; // Green
+    ledColors[i][2] = 255; // Blue
+  }
+
+  sendData(0, 100, 50, 5, ledColors);
+}
+
+void testRunningPixel() {
+  static int position = 0;
+  static int direction = 1;
+
+  uint8_t ledColors[NUM_LEDS][3] = {0};
+
+  // Set the current position to white
+  ledColors[position][0] = 255; // Red
+  ledColors[position][1] = 255; // Green
+  ledColors[position][2] = 255; // Blue
+
+  sendData(0, 100, 50, 5, ledColors);
+
+  // Update the position
+  position += direction;
+  if (position >= NUM_LEDS || position < 0) {
+    direction = -direction;
+    position += direction;
+  }
+}
+
 // Setup phase function
 void setupPhase() {
     const char* variableNames[] = {
@@ -434,14 +465,24 @@ void setupPhase() {
     int minValues[] = {0, 0, 10, 0, 1, 1, 5};
     int maxValues[] = {5, 20, 300, 30, 4, 10, 30};
 
-    for (int i = 0; i < 7; i++) {
+    // Send test signal to check all LEDs
+    while (!fwdPressed) {
+        displayRainbowAnimation();
+        displaySetupVariable(variableNames[0], *variables[0]); // Display the first variable as an example
+        handleSetupButtons(*variables[0], minValues[0], maxValues[0]);
+    }
+    fwdPressed = false; // Reset button state
+
+    for (int i = 1; i < 7; i++) {
         while (!fwdPressed) {
+            displayRainbowAnimation();
             displaySetupVariable(variableNames[i], *variables[i]);
             handleSetupButtons(*variables[i], minValues[i], maxValues[i]);
         }
         fwdPressed = false; // Reset button state
     }
 }
+
 
 void setup() { //MARK: set-up
   Serial.begin(115200);  // Initialize Serial Monitor
@@ -604,7 +645,7 @@ void loop() { //MARK:loop
 } else {
     // Competition is over - show endless rainbow
     while(true) {
-      displayRainbowAnimation(1);
+      displayRainbowAnimation();
     }
   }
 }
